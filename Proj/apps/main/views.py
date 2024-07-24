@@ -227,7 +227,7 @@ class ExecuteProcedureView(APIView):
 
         action_key_query_params = actions_mapping.get(action_query_param)
         filter_kwargs = {
-            'user': user,
+            'user_id': user.id,
             'form_id': form_id,
             action_key_query_params: True
         }
