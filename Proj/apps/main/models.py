@@ -1,8 +1,7 @@
 from django.db import models
 
 
-class Procedure(models.Model):
-    name = models.CharField(max_length=255)
+
     
 class PlaceGcode(models.Model):
     name = models.CharField(max_length=255)
@@ -15,6 +14,21 @@ class MaliYear(models.Model):
         
     )
     
+    
+
+    
+class ProcedureBaseTemplate(models.Model):
+    name = models.CharField(max_length=255 , null=True, blank=True)
+    output_part = models.TextField(null=True ,blank=True)
+    first_part = models.TextField(null=True,blank=True)
+    second_part = models.TextField(null=True,blank=True)
+    
+    def __str__(self) -> str:
+        return self.name if self.name else str(self.id)
+    
+class Procedure(models.Model):
+    name = models.CharField(max_length=255)
+    base_template = models.ForeignKey(ProcedureBaseTemplate, on_delete=models.CASCADE)
     
 class Form(models.Model):
     name = models.CharField(max_length=255)
@@ -32,9 +46,3 @@ class ProcedureFlag(models.Model):
     can_filter = models.BooleanField(default=False)
     can_confirm = models.BooleanField(default=False)
     can_return = models.BooleanField(default=False)
-    
-class ProcedureBaseTemplate(models.Model):
-    type = models.IntegerField()
-    first_part = models.TextField()
-    second_part = models.TextField()
-    

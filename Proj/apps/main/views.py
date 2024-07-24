@@ -7,6 +7,7 @@ import pyodbc
 import re
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+import json
 from ..account.models import MainAccess , UserAccessForm ,Procedure ,Form , ProcedureFlag ,ProcedureBaseTemplate
 # Database configuration
 db_config = {
@@ -18,6 +19,28 @@ db_config = {
     'driver': '{ODBC Driver 17 for SQL Server}',
 }
 
+def convert_sql_to_dict(sql_declaration):
+    # Remove the initial DECLARE part and split the variables by commas
+    variables = sql_declaration.replace("DECLARE", "").strip().split(",")
+    
+    # Create a dictionary to hold the output parameters
+    output_parameters = {}
+    
+    # Regex pattern to match the variable declaration
+    pattern = re.compile(r"@\w+\s+[\w\(\)]+")
+    
+    # Process each variable
+    for var in variables:
+        match = pattern.search(var.strip())
+        if match:
+            var_declaration = match.group()
+            var_name, var_type = var_declaration.split()
+            # Remove the @ from the variable name
+            var_name = var_name.lstrip('@')
+            # Add the variable to the dictionary
+            output_parameters[var_name] = var_type
+    
+    return output_parameters
 
 actions_mapping = {
     1:"can_add" ,
@@ -51,11 +74,15 @@ def get_db():
         ';PWD=' + db_config['password']
     )
 
-def execute_stored_procedure(proc_name, parameters, output_parameters ,procedure_type):
+def execute_stored_procedure(proc_name, parameters ,procedure):
     db = get_db()
     cursor = db.cursor()
 
-    procedure_type_obj = ProcedureBaseTemplate.objects.filter(type=procedure_type).last()
+    procedure_type_obj = procedure.base_template
+    
+    dict_output = convert_sql_to_dict(procedure_type_obj.output_part)
+    
+    
     
     param_list = []
     output_param_list = []
@@ -66,7 +93,7 @@ def execute_stored_procedure(proc_name, parameters, output_parameters ,procedure
             value = 'NULL'
         param_list.append(f"@{param} = {value}")
 
-    for output_param, output_type in output_parameters.items():
+    for output_param, output_type in dict_output.items():
         output_param_list.append(f"@{output_param} = @{output_param} OUTPUT")
 
     procedure_call = f"{proc_name}\n"
@@ -74,17 +101,18 @@ def execute_stored_procedure(proc_name, parameters, output_parameters ,procedure
     procedure_call = procedure_call + ",\n" 
 
     final = ""
-    for key , value in output_parameters.items():
+    for key , value in dict_output.items():
         x= f"@{key} {value},"
         final = final + x
 
     sql_script = f"""
+        {procedure_type_obj.output_part}
         {procedure_type_obj.first_part}
         {procedure_call}
         {procedure_type_obj.second_part} 
     """
     
-
+    print(dict_output)
     cursor.execute(sql_script)
     result = cursor.fetchone()
     # output = {param: cursor.fetchone() for param in output_parameters} 
@@ -92,7 +120,7 @@ def execute_stored_procedure(proc_name, parameters, output_parameters ,procedure
     output = cursor.fetchone()
     output = {}
     i = 0
-    for param in output_parameters:
+    for param in dict_output:
         try:
             value = result[i]
             if type(value) == tuple:
@@ -188,10 +216,9 @@ class ExecuteProcedureView(APIView):
         except Form.DoesNotExist:
             return Response({'error': 'Form not found'}, status=status.HTTP_404_NOT_FOUND)
         
-        mali_year = data.get("mali_year")
+        mali_year = data.get("MaliYearGcode")
         place_gcode =  data.get("place_gcode")
         company_code = data.get("company_code")
-        procedure_type = data.get("procedure_type")
         
         flag = True
         
@@ -217,7 +244,6 @@ class ExecuteProcedureView(APIView):
         
 
         parameters = data.get('parameters', None)
-        output_parameters = data.get('output_parameters', None)
         
         parameters_action = parameters.get("Action")
         if parameters_action:
@@ -258,5 +284,5 @@ class ExecuteProcedureView(APIView):
 
 
         final_procedure_name = f'[dbo].[{procedure_name}]'
-        result = execute_stored_procedure(final_procedure_name, parameters, output_parameters , procedure_type)
+        result = execute_stored_procedure(final_procedure_name, parameters , procedure)
         return Response({'result': result})
