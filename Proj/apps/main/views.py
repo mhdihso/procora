@@ -160,7 +160,7 @@ class ExecuteProcedureView(APIView):
         data = request.data
 
         user = request.user
-
+        form_id = data.pop('form_id', None)
         action_query_param = request.query_params.get("action")
         
         if not action_query_param:
@@ -205,7 +205,6 @@ class ExecuteProcedureView(APIView):
         if not flag:
             return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
         
-        form_id = data.pop('form_id', None)
         
         if not UserAccessForm.objects.filter(user=user, form_id=form_id).exists():
             return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
