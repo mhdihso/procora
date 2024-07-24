@@ -7,7 +7,7 @@ import pyodbc
 import re
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-from ..account.models import MainAccess , UserAccessForm
+from ..account.models import MainAccess , UserAccessForm ,Procedure ,Form , ProcedureFlag
 # Database configuration
 db_config = {
     'user': 'AvaBack1',
@@ -173,6 +173,16 @@ class ExecuteProcedureView(APIView):
         # if check_for_sql_injection(procedure_name):
         #     return Response({'error': 'SQL injection detected'}, status=status.HTTP_400_BAD_REQUEST)
 
+        try:
+            procedure = Procedure.objects.get(name=procedure_name)
+            form = Form.objects.get(id=form_id)
+            if not form.procedures.filter(id=procedure.id).exists():
+                return Response({'error': 'Procedure is not associated with the given form'}, status=status.HTTP_403_FORBIDDEN)
+        except Procedure.DoesNotExist:
+            return Response({'error': 'Procedure not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Form.DoesNotExist:
+            return Response({'error': 'Form not found'}, status=status.HTTP_404_NOT_FOUND)
+        
         mali_year = data.get("mali_year")
         place_gcode =  data.get("place_gcode")
         company_code = data.get("company_code")
@@ -231,6 +241,16 @@ class ExecuteProcedureView(APIView):
 
         if not procedure_name or not parameters or not output_parameters:
             return Response({'error': 'Procedure name, parameters, and output parameters are required in the body'}, status=status.HTTP_400_BAD_REQUEST)
+
+        action_key_query_params = actions_mapping.get(action_query_param)
+        filter_kwargs = {
+            'procedure': procedure,
+            action_key_query_params: True
+        }
+
+        if not ProcedureFlag.objects.filter(**filter_kwargs).exists():
+            return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
+
 
         final_procedure_name = f'[dbo].[{procedure_name}]'
         result = execute_stored_procedure(final_procedure_name, parameters, output_parameters)
