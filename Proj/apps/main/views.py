@@ -241,7 +241,7 @@ class ExecuteProcedureView(APIView):
         if not procedure_name or not parameters or not output_parameters:
             return Response({'error': 'Procedure name, parameters, and output parameters are required in the body'}, status=status.HTTP_400_BAD_REQUEST)
 
-        action_key_query_params = actions_mapping.get(action_query_param)
+        action_key_query_params = actions_mapping.get(int(action_query_param))
         filter_kwargs = {
             'procedure': procedure,
             action_key_query_params: True
