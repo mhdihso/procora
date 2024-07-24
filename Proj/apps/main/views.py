@@ -7,7 +7,7 @@ import pyodbc
 import re
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-from ..account.models import MainAccess , UserAccessForm ,Procedure ,Form , ProcedureFlag
+from ..account.models import MainAccess , UserAccessForm ,Procedure ,Form , ProcedureFlag ,ProcedureBaseTemplate
 # Database configuration
 db_config = {
     'user': 'AvaBack1',
@@ -51,10 +51,12 @@ def get_db():
         ';PWD=' + db_config['password']
     )
 
-def execute_stored_procedure(proc_name, parameters, output_parameters):
+def execute_stored_procedure(proc_name, parameters, output_parameters ,procedure_type):
     db = get_db()
     cursor = db.cursor()
 
+    procedure_type_obj = ProcedureBaseTemplate.objects.filter(type=procedure_type).last()
+    
     param_list = []
     output_param_list = []
     for param, value in parameters.items():
@@ -68,23 +70,26 @@ def execute_stored_procedure(proc_name, parameters, output_parameters):
         output_param_list.append(f"@{output_param} = @{output_param} OUTPUT")
 
     procedure_call = f"{proc_name}\n"
-    procedure_call += "    " + ",\n    ".join(param_list + output_param_list)
+    procedure_call += "    " + ",\n    ".join(param_list)
+    procedure_call = procedure_call + ",\n" 
 
-    declare_output_vars = "\n".join([f"DECLARE @{param} {output_type}" for param, output_type in output_parameters.items()])
-    select_output_vars = "\n".join([f"SELECT @{param} as '{param}'" for param in output_parameters])
+    final = ""
+    for key , value in output_parameters.items():
+        x= f"@{key} {value},"
+        final = final + x
 
     sql_script = f"""
-    {declare_output_vars}
-
-    EXEC {procedure_call}
-
-    {select_output_vars}
+        {procedure_type_obj.first_part}
+        {procedure_call}
+        {procedure_type_obj.second_part} 
     """
+    
 
     cursor.execute(sql_script)
     result = cursor.fetchone()
     # output = {param: cursor.fetchone() for param in output_parameters} 
     
+    output = cursor.fetchone()
     output = {}
     i = 0
     for param in output_parameters:
@@ -186,6 +191,7 @@ class ExecuteProcedureView(APIView):
         mali_year = data.get("mali_year")
         place_gcode =  data.get("place_gcode")
         company_code = data.get("company_code")
+        procedure_type = data.get("procedure_type")
         
         flag = True
         
@@ -238,7 +244,7 @@ class ExecuteProcedureView(APIView):
         #     if check_for_sql_injection(key) or check_for_sql_injection(value):
         #         return Response({'error': 'SQL injection detected'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not procedure_name or not parameters or not output_parameters:
+        if not procedure_name or not parameters :
             return Response({'error': 'Procedure name, parameters, and output parameters are required in the body'}, status=status.HTTP_400_BAD_REQUEST)
 
         action_key_query_params = actions_mapping.get(int(action_query_param))
@@ -252,6 +258,5 @@ class ExecuteProcedureView(APIView):
 
 
         final_procedure_name = f'[dbo].[{procedure_name}]'
-        result = execute_stored_procedure(final_procedure_name, parameters, output_parameters)
-
+        result = execute_stored_procedure(final_procedure_name, parameters, output_parameters , procedure_type)
         return Response({'result': result})

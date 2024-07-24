@@ -32,3 +32,9 @@ class ProcedureFlag(models.Model):
     can_filter = models.BooleanField(default=False)
     can_confirm = models.BooleanField(default=False)
     can_return = models.BooleanField(default=False)
+    
+class ProcedureBaseTemplate(models.Model):
+    type = models.IntegerField()
+    first_part = models.TextField()
+    second_part = models.TextField()
+    
