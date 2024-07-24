@@ -23,3 +23,5 @@ class MyUserAdmin(UserAdmin):
 
 
 admin.site.register(User, MyUserAdmin)
+admin.site.register(MainAccess)
+admin.site.register(UserAccessForm)

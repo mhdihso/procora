@@ -18,7 +18,7 @@ class User(AbstractUser):
 
 class MainAccess(models.Model):
     user = models.OneToOneField(AUTH_USER_MODEL, on_delete=models.CASCADE)
-    mali_year = models.ManyToManyField(MaliYear, blank=True)
+    mali_years = models.ManyToManyField(MaliYear, blank=True)
     place_gcodes = models.ManyToManyField(PlaceGcode, blank=True)
     company_codes = models.ManyToManyField(CompanyCode, blank=True)
     

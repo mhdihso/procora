@@ -1,5 +1,5 @@
 from rest_framework import views, permissions, response, status, generics, decorators
-from . import utils, models, serializers, services , docs
+from . import utils, models, serializers, services , docs , permissions as perms
 import base64
 from django.contrib.auth import authenticate
 from django.utils import timezone 
@@ -59,3 +59,4 @@ def base_login(request):
 #     except:
 #         pass
 #     return response.Response({'detail': "با موفقیت خارج شدید."}, status=status.HTTP_200_OK)
+

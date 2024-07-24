@@ -201,3 +201,5 @@ JAZZMIN_SETTINGS = {
     "custom_js": None,
     "show_ui_builder": False,
 }
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

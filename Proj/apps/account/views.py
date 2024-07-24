@@ -17,11 +17,11 @@ def main_access_list(request ):
     else:
         user = request.data.get("user")
         obj , crt = models.MainAccess.objects.get_or_create(user_id=user)
-        procedures = request.data.get("procedures" , [])
+        mali_years = request.data.get("mali_years" , [])
         place_gcodes = request.data.get("place_gcodes" , [])
         company_codes = request.data.get("company_codes" , [])
         
-        obj.procedures.set(procedures)
+        obj.mali_years.set(mali_years)
         obj.place_gcodes.set(place_gcodes)
         obj.company_codes.set(company_codes)
         
@@ -60,3 +60,27 @@ def form_access_list(request):
             serializer.save()
 
         return response.Response({"data": serializer.data}, status=status.HTTP_201_CREATED)    
+    
+    
+
+@decorators.api_view(['POST', ])
+@decorators.permission_classes([permissions.IsAuthenticated,perms.IsAdmin])
+def base_register(request):
+
+    username = request.data.get("username")
+    password = request.data.get("password")
+    first_name = request.data.get("first_name")
+    last_name = request.data.get("last_name")
+    if User.objects.filter(username=username).exists():
+        return response.Response({"error": "user already exists"}, status=status.HTTP_400_BAD_REQUEST)
+    user = User.objects.create_user(username=username, password=password , first_name = first_name ,
+                                                last_name = last_name  ,type=models.User.Types.USER)
+    user.set_password(password)
+    data = serializers.UserSerializer(user).data
+    token = utils.get_tokens_for_user(user)
+    data['access'] = token['access']
+    data['refresh'] = token['refresh']
+
+
+
+    return response.Response(data, status=status.HTTP_200_OK)
