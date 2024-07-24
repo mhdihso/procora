@@ -1,6 +1,42 @@
 from rest_framework import views, permissions, response, status, generics, decorators
 from . import utils, models, serializers, services , docs , permissions as perms
 from .. account.models import User
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+
+@swagger_auto_schema(
+    method='post', 
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            'requirement': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'user': openapi.Schema(type=openapi.TYPE_NUMBER),
+                    'mali_years': openapi.Schema(type=openapi.TYPE_NUMBER),
+                    'place_gcodes': openapi.Schema(type=openapi.TYPE_STRING),
+                    'company_codes': openapi.Schema(type=openapi.TYPE_STRING),
+                },
+            )),
+        },
+    ),
+    responses={
+        200: openapi.Response('Successful'),
+        400: 'Bad Request',
+    },
+    operation_description='دسترسی های اصلی',
+)
+@swagger_auto_schema(
+    method='get',
+    manual_parameters=[
+        openapi.Parameter(
+            'user_id',
+            openapi.IN_QUERY,
+            type=openapi.TYPE_STRING
+        ),
+    ],
+)
+
 @decorators.api_view(['GET', 'POST'])
 @decorators.permission_classes([permissions.IsAuthenticated,perms.IsAdmin])
 def main_access_list(request ):
@@ -27,7 +63,52 @@ def main_access_list(request ):
         
         return response.Response(status=status.HTTP_201_CREATED)
     
+@swagger_auto_schema(
+    method='post', 
     
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            'requirement': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'form': openapi.Schema(type=openapi.TYPE_NUMBER),
+                    'user': openapi.Schema(type=openapi.TYPE_NUMBER),
+                    'can_add': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                    'can_edit': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                    'can_delete': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                    'can_see': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                    'can_print': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                    'can_log': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                    'can_flow': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                    'can_filter': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                    'can_confirm': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                    'can_return': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                },
+            )),
+        },
+    ),
+    responses={
+        200: openapi.Response('Successful'),
+        400: 'Bad Request',
+    },
+    operation_description='دسترسی های فرم',
+)
+@swagger_auto_schema(
+    method='get',
+    manual_parameters=[
+        openapi.Parameter(
+            'user',
+            openapi.IN_QUERY,
+            type=openapi.TYPE_STRING
+        ),
+        openapi.Parameter(
+            'form',
+            openapi.IN_QUERY,
+            type=openapi.TYPE_STRING
+        ),
+    ],
+)    
 @decorators.api_view(['GET', 'POST'])
 @decorators.permission_classes([permissions.IsAuthenticated,perms.IsAdmin])
 def form_access_list(request):
@@ -62,7 +143,29 @@ def form_access_list(request):
         return response.Response({"data": serializer.data}, status=status.HTTP_201_CREATED)    
     
     
-
+@swagger_auto_schema(
+    method='post', 
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            'under_coverage_id': openapi.Schema(type=openapi.TYPE_STRING),
+            'requirement': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'username': openapi.Schema(type=openapi.TYPE_STRING),
+                    'password': openapi.Schema(type=openapi.TYPE_STRING),
+                    'first_name': openapi.Schema(type=openapi.TYPE_STRING),
+                    'last_name': openapi.Schema(type=openapi.TYPE_STRING),
+                },
+            )),
+        },
+    ),
+    responses={
+        200: openapi.Response('Successful'),
+        400: 'Bad Request',
+    },
+    operation_description='ثبت نام',
+)
 @decorators.api_view(['POST', ])
 @decorators.permission_classes([permissions.IsAuthenticated,perms.IsAdmin])
 def base_register(request):

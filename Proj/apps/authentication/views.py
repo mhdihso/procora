@@ -4,10 +4,29 @@ import base64
 from django.contrib.auth import authenticate
 from django.utils import timezone 
 from datetime import timedelta
-from drf_yasg.utils import swagger_auto_schema 
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
+@swagger_auto_schema(
+    method='post', 
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            'requirement': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'username': openapi.Schema(type=openapi.TYPE_STRING),
+                    'password': openapi.Schema(type=openapi.TYPE_STRING),
 
-
+                },
+            )),
+        },
+    ),
+    responses={
+        200: openapi.Response('Successful'),
+        400: 'Bad Request',
+    },
+)
 @decorators.api_view(['POST', ])
 @decorators.permission_classes([permissions.AllowAny, ])
 def base_login(request):

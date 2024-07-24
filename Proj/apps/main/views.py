@@ -5,6 +5,8 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 import pyodbc
 import re
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 from ..account.models import MainAccess , UserAccessForm
 # Database configuration
 db_config = {
@@ -105,9 +107,58 @@ def execute_stored_procedure(proc_name, parameters, output_parameters):
 class ExecuteProcedureView(APIView):
     permission_classes = [IsAuthenticated]
 
+
+
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter(
+                'action',
+                openapi.IN_QUERY,
+                description="Action parameter",
+                type=openapi.TYPE_STRING,
+                required=True
+            ),
+        ],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'procedure_name': openapi.Schema(type=openapi.TYPE_STRING, description='Procedure name'),
+                'output_parameters': openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'return_value': openapi.Schema(type=openapi.TYPE_INTEGER, description='Return value')
+                    },
+                    required=['return_value'],
+                ),
+                'parameters': openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'mali_year': openapi.Schema(type=openapi.TYPE_INTEGER, description='Mali Year code'),
+                        'place_gcode': openapi.Schema(type=openapi.TYPE_INTEGER, description='Places Gcode'),
+                        'company_code': openapi.Schema(type=openapi.TYPE_STRING, description='Company Codes'),
+                        'action': openapi.Schema(type=openapi.TYPE_STRING, description='Action')
+                    },
+                    required=['MaliYearGcode', 'PlacesGcode', 'company_codes'],
+                ),
+                'form_id': openapi.Schema(type=openapi.TYPE_STRING, description='Form ID')
+            },
+            required=['procedure_name', 'output_parameters', 'parameters'],
+        ),
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'result': openapi.Schema(type=openapi.TYPE_OBJECT, description='Result of the stored procedure')
+                }
+            )),
+            400: 'Bad Request',
+            403: 'Forbidden',
+        },
+        operation_description='Execute stored procedure with the given parameters and action',
+    )
     def post(self, request, *args, **kwargs):
         data = request.data
-        body = data.get('body', None)
+
         user = request.user
 
         action_query_param = request.query_params.get("action")
@@ -115,16 +166,16 @@ class ExecuteProcedureView(APIView):
         if not action_query_param:
             return Response({'error': 'Action is required'}, status=status.HTTP_400_BAD_REQUEST)
         
-        if not body or not body.get("procedure_name"):
+        if not data or not data.get("procedure_name"):
             return Response({'error': 'Procedure name and body are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        procedure_name = body.get('procedure_name', None)
+        procedure_name = data.get('procedure_name', None)
         # if check_for_sql_injection(procedure_name):
         #     return Response({'error': 'SQL injection detected'}, status=status.HTTP_400_BAD_REQUEST)
 
-        mali_year = body.get("mali_year")
-        place_gcodes =  body.get("place_gcodes")
-        company_codes = body.get("company_codes")
+        mali_year = data.get("mali_year")
+        place_gcode =  data.get("place_gcode")
+        company_code = data.get("company_code")
         
         flag = True
         
@@ -132,26 +183,26 @@ class ExecuteProcedureView(APIView):
             if not MainAccess.objects.filter(user=user, mali_year__name__icontains=mali_year).exists():
                 flag = False
                 
-        if place_gcodes:
-            if not MainAccess.objects.filter(user=user, place_gcode__name__icontains=place_gcodes).exists():
+        if place_gcode:
+            if not MainAccess.objects.filter(user=user, place_gcode__name__icontains=place_gcode).exists():
                 flag = False
                 
                 
-        if company_codes:
-            if not MainAccess.objects.filter(user=user, company_code__name__icontains=company_codes).exists():
+        if company_code:
+            if not MainAccess.objects.filter(user=user, company_code__name__icontains=company_code).exists():
                 flag = False
                 
         if not flag:
             return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
         
-        form_id = body.pop('form_id', None)
+        form_id = data.pop('form_id', None)
         
         if not UserAccessForm.objects.filter(user=user, form_id=form_id).exists():
             return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
         
 
-        parameters = body.get('parameters', None)
-        output_parameters = body.get('output_parameters', None)
+        parameters = data.get('parameters', None)
+        output_parameters = data.get('output_parameters', None)
         
         parameters_action = parameters.get("action")
         if parameters_action:
