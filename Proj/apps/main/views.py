@@ -219,7 +219,7 @@ class ExecuteProcedureView(APIView):
         parameters = data.get('parameters', None)
         output_parameters = data.get('output_parameters', None)
         
-        parameters_action = parameters.get("action")
+        parameters_action = parameters.get("Action")
         if parameters_action:
             action_key = actions_mapping.get(int(parameters_action))
             filter_kwargs = {
