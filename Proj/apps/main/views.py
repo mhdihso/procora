@@ -215,7 +215,7 @@ class ExecuteProcedureView(APIView):
         
         parameters_action = parameters.get("action")
         if parameters_action:
-            action_key = actions_mapping.get(parameters_action)
+            action_key = actions_mapping.get(int(parameters_action))
             filter_kwargs = {
                 'user': user,
                 'form_id': form_id,
@@ -225,9 +225,9 @@ class ExecuteProcedureView(APIView):
             if not UserAccessForm.objects.filter(**filter_kwargs).exists():
                 return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
 
-        action_key_query_params = actions_mapping.get(action_query_param)
+        action_key_query_params = actions_mapping.get(int(action_query_param))
         filter_kwargs = {
-            'user_id': user.id,
+            'user': user,
             'form_id': form_id,
             action_key_query_params: True
         }
