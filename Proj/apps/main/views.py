@@ -217,8 +217,8 @@ class ExecuteProcedureView(APIView):
             return Response({'error': 'Form not found'}, status=status.HTTP_404_NOT_FOUND)
         
         mali_year = data.get("MaliYearGcode")
-        place_gcode =  data.get("place_gcode")
-        company_code = data.get("company_code")
+        place_gcode =  data.get("PlacesGcode")
+        company_code = data.get("CompanyCode")
         
         flag = True
         
