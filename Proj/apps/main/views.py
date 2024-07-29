@@ -9,15 +9,8 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 import json
 from ..account.models import MainAccess , UserAccessForm ,Procedure ,Form , ProcedureFlag ,ProcedureBaseTemplate
-# Database configuration
-db_config = {
-    'user': 'AvaBack1',
-    'password': 'Av@B@ck1$',
-    'host': '192.168.1.151',
-    'port': '1433',
-    'database': 'DsMaliA',
-    'driver': '{ODBC Driver 17 for SQL Server}',
-}
+from db import maindb 
+
 
 def convert_sql_to_dict(sql_declaration):
     # Remove the initial DECLARE part and split the variables by commas
@@ -64,19 +57,16 @@ def check_for_sql_injection(input_text):
         return False
     return sql_injection_pattern.search(input_text) is not None
 
-def get_db():
-    return pyodbc.connect(
-        'DRIVER=' + db_config['driver'] +
-        ';SERVER=' + db_config['host'] +
-        ';PORT=' + db_config['port'] +
-        ';DATABASE=' + db_config['database'] +
-        ';UID=' + db_config['user'] +
-        ';PWD=' + db_config['password']
-    )
-
 def execute_stored_procedure(proc_name, parameters ,procedure):
-    db = get_db()
-    cursor = db.cursor()
+    
+    try:
+        db = maindb.get_db()
+        cursor = db.cursor()
+    except:
+        db = maindb.re_connect()
+        cursor = db.cursor()
+    
+        
 
     procedure_type_obj = procedure.base_template
     
@@ -104,33 +94,47 @@ def execute_stored_procedure(proc_name, parameters ,procedure):
     for key , value in dict_output.items():
         x= f"@{key} {value},"
         final = final + x
-
-    sql_script = f"""
+    try:
+        sql_script = f"""
+            {procedure_type_obj.output_part}
+            {procedure_type_obj.first_part}
+            {procedure_call}
+            {procedure_type_obj.second_part} 
+        """
+        cursor.execute(sql_script)
+    except:
+        sql_script = f"""
         {procedure_type_obj.output_part}
         {procedure_type_obj.first_part}
-        {procedure_call}
+        {procedure_call[:-2]}
         {procedure_type_obj.second_part} 
     """
-    
-    print(dict_output)
-    cursor.execute(sql_script)
+        cursor.execute(sql_script)
     result = cursor.fetchone()
+    # print(list(result))
     # output = {param: cursor.fetchone() for param in output_parameters} 
     
     output = cursor.fetchone()
     output = {}
+
     i = 0
-    for param in dict_output:
-        try:
-            value = result[i]
-            if type(value) == tuple:
-                value = list(value)
-        except: 
-            value = None
+    if procedure.is_get:
+        json_string = result[0]
 
-        output.update({f"{param}" : f"{value}"})
-        i += 1
+        output = json.loads(json_string)
+    else:
+        output = {}
+        i = 0
+        for param in dict_output:
+            try:
+                value = result[i]
+                if type(value) == tuple:
+                    value = list(value)
+            except: 
+                value = None
 
+            output.update({f"{param}" : f"{value}"})
+            i += 1
 
     cursor.close()
     db.close()
@@ -240,6 +244,7 @@ class ExecuteProcedureView(APIView):
         
         
         if not UserAccessForm.objects.filter(user=user, form_id=form_id).exists():
+            print("++")
             return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
         
 
@@ -285,4 +290,5 @@ class ExecuteProcedureView(APIView):
 
         final_procedure_name = f'[dbo].[{procedure_name}]'
         result = execute_stored_procedure(final_procedure_name, parameters , procedure)
+
         return Response({'result': result})

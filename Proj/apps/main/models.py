@@ -28,6 +28,7 @@ class ProcedureBaseTemplate(models.Model):
     
 class Procedure(models.Model):
     name = models.CharField(max_length=255)
+    is_get = models.BooleanField(default=False)
     base_template = models.ForeignKey(ProcedureBaseTemplate, on_delete=models.CASCADE)
     
 class Form(models.Model):
