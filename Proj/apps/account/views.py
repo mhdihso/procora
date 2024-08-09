@@ -187,3 +187,17 @@ def base_register(request):
 
 
     return response.Response(data, status=status.HTTP_200_OK)
+
+
+class UserList(generics.ListAPIView):
+    serializer_class = serializers.UserRawSerializer
+    permission_classes = [permissions.IsAuthenticated,perms.IsAdmin]
+    
+    def get_queryset(self):
+        queryset =  User.objects.all()
+        
+        type = self.request.query_params.get("type")
+        if type:
+            queryset = queryset.filter(type=type)
+            
+        return queryset

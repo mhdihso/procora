@@ -1,13 +1,14 @@
 # myapp/views.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status , generics
 from rest_framework.permissions import IsAuthenticated
 import pyodbc
 import re
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 import json
+from . import models ,serializers
 from ..account.models import MainAccess , UserAccessForm ,Procedure ,Form , ProcedureFlag ,ProcedureBaseTemplate
 from db import maindb 
 
@@ -292,3 +293,35 @@ class ExecuteProcedureView(APIView):
         result = execute_stored_procedure(final_procedure_name, parameters , procedure)
 
         return Response({'result': result})
+
+
+class MaliYearListView(generics.ListAPIView):
+    queryset = models.MaliYear.objects.all()
+    serializer_class = serializers.MaliYearSerializer
+
+
+class PlaceGcodeListView(generics.ListAPIView):
+    queryset = models.PlaceGcode.objects.all()
+    serializer_class = serializers.PlaceGcodeSerializer
+    
+
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+    
+class CompanyCodeListView(generics.ListAPIView):
+    queryset = models.CompanyCode.objects.all()
+    serializer_class = serializers.CompanyCodeSerializer
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+    
+class FormListView(generics.ListAPIView):
+    queryset = models.Form.objects.all()
+    serializer_class = serializers.FormSerializer
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+    
+class ProcedureListView(generics.ListAPIView):
+    queryset = models.Procedure.objects.all()
+    serializer_class = serializers.ProcedureSerializer
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)

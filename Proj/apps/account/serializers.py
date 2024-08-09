@@ -29,7 +29,7 @@ class UserRawSerializer(serializers.ModelSerializer):
     class Meta:
         ref_name = 'user_raw'
         model = models.User
-        fields = '__all__'
+        exclude = ('password' ,)
 
 
 class MainAccessSerializer(serializers.ModelSerializer):
