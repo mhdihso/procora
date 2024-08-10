@@ -4,20 +4,20 @@ from django.db import models
 
     
 class PlaceGcode(models.Model):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255 , unique=True)
     
     
     def __str__(self) -> str:
         return self.name
     
 class CompanyCode(models.Model):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, unique=True)
     
     def __str__(self) -> str:
         return self.name
 
 class MaliYear(models.Model):
-    name = models.CharField(max_length=255   
+    name = models.CharField(max_length=255 , unique=True   
     )
     def __str__(self) -> str:
         return self.name
@@ -35,7 +35,7 @@ class ProcedureBaseTemplate(models.Model):
         return self.name if self.name else str(self.id)
     
 class Procedure(models.Model):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, unique=True)
     is_get = models.BooleanField(default=False)
     base_template = models.ForeignKey(ProcedureBaseTemplate, on_delete=models.CASCADE)
     
