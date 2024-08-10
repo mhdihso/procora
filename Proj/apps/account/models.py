@@ -38,3 +38,6 @@ class UserAccessForm(models.Model):
     can_confirm = models.BooleanField(default=False)
     can_return = models.BooleanField(default=False)
     
+    def __str__(self) -> str:
+        return self.form.name+' : '+str(self.user.id)
+    

@@ -6,13 +6,21 @@ from django.db import models
 class PlaceGcode(models.Model):
     name = models.CharField(max_length=255)
     
+    
+    def __str__(self) -> str:
+        return self.name
+    
 class CompanyCode(models.Model):
     name = models.CharField(max_length=255)
+    
+    def __str__(self) -> str:
+        return self.name
 
 class MaliYear(models.Model):
-    name = models.CharField(max_length=255
-        
+    name = models.CharField(max_length=255   
     )
+    def __str__(self) -> str:
+        return self.name
     
     
 
@@ -31,9 +39,16 @@ class Procedure(models.Model):
     is_get = models.BooleanField(default=False)
     base_template = models.ForeignKey(ProcedureBaseTemplate, on_delete=models.CASCADE)
     
+    
+    def __str__(self) -> str:
+        return self.name + ' : '+ str(self.id)
+    
 class Form(models.Model):
     name = models.CharField(max_length=255)
     procedures = models.ManyToManyField(Procedure, blank=True)
+    
+    def __str__(self) -> str:
+        return self.name + ' : '+ str(self.id)
     
 class ProcedureFlag(models.Model):
     procedure = models.ForeignKey(Procedure,on_delete=models.CASCADE)
@@ -47,3 +62,6 @@ class ProcedureFlag(models.Model):
     can_filter = models.BooleanField(default=False)
     can_confirm = models.BooleanField(default=False)
     can_return = models.BooleanField(default=False)
+    
+    def __str__(self) -> str:
+        return self.procedure.name + ' : '+str(self.procedure.id)
