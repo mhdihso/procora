@@ -2,7 +2,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status , generics
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated ,AllowAny
 import pyodbc
 import re
 from drf_yasg.utils import swagger_auto_schema
@@ -143,7 +143,7 @@ def execute_stored_procedure(proc_name, parameters ,procedure):
     return output
 
 class ExecuteProcedureView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
 
 
@@ -221,72 +221,78 @@ class ExecuteProcedureView(APIView):
         except Form.DoesNotExist:
             return Response({'error': 'Form not found'}, status=status.HTTP_404_NOT_FOUND)
         
-        mali_year = data.get("MaliYearGcode")
-        place_gcode =  data.get("PlacesGcode")
-        company_code = data.get("CompanyCode")
         
-        flag = True
-        
-        if mali_year:
-            if not MainAccess.objects.filter(user=user, mali_year__name__icontains=mali_year).exists():
-                flag = False
-                
-        if place_gcode:
-            if not MainAccess.objects.filter(user=user, place_gcode__name__icontains=place_gcode).exists():
-                flag = False
-                
-                
-        if company_code:
-            if not MainAccess.objects.filter(user=user, company_code__name__icontains=company_code).exists():
-                flag = False
-                
-        if not flag:
-            return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
-        
-        
-        if not UserAccessForm.objects.filter(user=user, form_id=form_id).exists():
-            print("++")
-            return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
-        
-
         parameters = data.get('parameters', None)
+        if procedure.is_public:
+            pass
+        else:
+            if not  request.user.is_authenticated:
+                return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
+
+            mali_year = data.get("MaliYearGcode")
+            place_gcode =  data.get("PlacesGcode")
+            company_code = data.get("CompanyCode")
+            
+            flag = True
+            
+            if mali_year:
+                if not MainAccess.objects.filter(user=user, mali_year__name__icontains=mali_year).exists():
+                    flag = False
+                    
+            if place_gcode:
+                if not MainAccess.objects.filter(user=user, place_gcode__name__icontains=place_gcode).exists():
+                    flag = False
+                    
+                    
+            if company_code:
+                if not MainAccess.objects.filter(user=user, company_code__name__icontains=company_code).exists():
+                    flag = False
+                    
+            if not flag:
+                return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
         
-        parameters_action = parameters.get("Action")
-        if parameters_action:
-            action_key = actions_mapping.get(int(parameters_action))
+        
+            if not UserAccessForm.objects.filter(user=user, form_id=form_id).exists():
+                return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
+        
+            
+            parameters_action = parameters.get("Action")
+            if parameters_action:
+                action_key = actions_mapping.get(int(parameters_action))
+                filter_kwargs = {
+                    'user': user,
+                    'form_id': form_id,
+                    action_key: True
+                }
+
+                if not UserAccessForm.objects.filter(**filter_kwargs).exists():
+                    return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
+
+            action_key_query_params = actions_mapping.get(int(action_query_param))
             filter_kwargs = {
                 'user': user,
                 'form_id': form_id,
-                action_key: True
+                action_key_query_params: True
             }
 
             if not UserAccessForm.objects.filter(**filter_kwargs).exists():
                 return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
-
-        action_key_query_params = actions_mapping.get(int(action_query_param))
-        filter_kwargs = {
-            'user': user,
-            'form_id': form_id,
-            action_key_query_params: True
-        }
-
-        if not UserAccessForm.objects.filter(**filter_kwargs).exists():
-            return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
         # for key, value in parameters.items():
         #     if check_for_sql_injection(key) or check_for_sql_injection(value):
         #         return Response({'error': 'SQL injection detected'}, status=status.HTTP_400_BAD_REQUEST)
 
+
+            action_key_query_params = actions_mapping.get(int(action_query_param))
+            filter_kwargs = {
+                'procedure': procedure,
+                action_key_query_params: True
+            }
+
+            if not ProcedureFlag.objects.filter(**filter_kwargs).exists():
+                return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
+
         if not procedure_name or not parameters :
             return Response({'error': 'Procedure name, parameters, and output parameters are required in the body'}, status=status.HTTP_400_BAD_REQUEST)
-
-        action_key_query_params = actions_mapping.get(int(action_query_param))
-        filter_kwargs = {
-            'procedure': procedure,
-            action_key_query_params: True
-        }
-
-        if not ProcedureFlag.objects.filter(**filter_kwargs).exists():
-            return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
 
 
         final_procedure_name = f'[dbo].[{procedure_name}]'

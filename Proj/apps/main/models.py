@@ -1,20 +1,21 @@
 from django.db import models
 
 
-
+class CompanyCode(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    
+    def __str__(self) -> str:
+        return self.name
     
 class PlaceGcode(models.Model):
+    company_code = models.ForeignKey(CompanyCode, on_delete=models.CASCADE)
     name = models.CharField(max_length=255 , unique=True)
     
     
     def __str__(self) -> str:
         return self.name
     
-class CompanyCode(models.Model):
-    name = models.CharField(max_length=255, unique=True)
-    
-    def __str__(self) -> str:
-        return self.name
+
 
 class MaliYear(models.Model):
     name = models.CharField(max_length=255 , unique=True   
@@ -37,6 +38,7 @@ class ProcedureBaseTemplate(models.Model):
 class Procedure(models.Model):
     name = models.CharField(max_length=255, unique=True)
     is_get = models.BooleanField(default=False)
+    is_public = models.BooleanField(default=False)
     base_template = models.ForeignKey(ProcedureBaseTemplate, on_delete=models.CASCADE)
     
     
