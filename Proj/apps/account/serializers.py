@@ -35,10 +35,14 @@ class UserRawSerializer(serializers.ModelSerializer):
 
 class MainAccessSerializer(serializers.ModelSerializer):
 
+    mali_years = serializers.SerializerMethodField()
+    place_gcodes = serializers.SerializerMethodField()
+    company_codes = serializers.SerializerMethodField()
+
     class Meta:
         model = models.MainAccess
-        fields = "__all__"
-
+        fields = ['user', 'mali_years', 'place_gcodes', 'company_codes']
+        
     def get_mali_years(self, obj):
         return [
             {"id": mali_year.id, "name": mali_year.name}
