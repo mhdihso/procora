@@ -1,6 +1,8 @@
 # myapp/views.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from django.core.exceptions import ValidationError
+
 from rest_framework import status , generics
 from rest_framework.permissions import IsAuthenticated ,AllowAny
 import pyodbc
@@ -114,15 +116,18 @@ def execute_stored_procedure(proc_name, parameters ,procedure):
     result = cursor.fetchone()
     # print(list(result))
     # output = {param: cursor.fetchone() for param in output_parameters} 
-    
+
     output = cursor.fetchone()
     output = {}
 
     i = 0
     if procedure.is_get:
         json_string = result[0]
+        try:
+            output = json.loads(json_string)
+        except:
+            return None
 
-        output = json.loads(json_string)
     else:
         output = {}
         i = 0
@@ -204,8 +209,8 @@ class ExecuteProcedureView(APIView):
         if not action_query_param:
             return Response({'error': 'Action is required'}, status=status.HTTP_400_BAD_REQUEST)
         
-        if not data or not data.get("procedure_name"):
-            return Response({'error': 'Procedure name and body are required'}, status=status.HTTP_400_BAD_REQUEST)
+        # if not data or not data.get("procedure_name"):
+        #     return Response({'error': 'Procedure name and body are required'}, status=status.HTTP_400_BAD_REQUEST)
 
         procedure_name = data.get('procedure_name', None)
         # if check_for_sql_injection(procedure_name):
@@ -213,9 +218,12 @@ class ExecuteProcedureView(APIView):
 
         try:
             procedure = Procedure.objects.get(name=procedure_name)
-            form = Form.objects.get(id=form_id)
-            if not form.procedures.filter(id=procedure.id).exists():
-                return Response({'error': 'Procedure is not associated with the given form'}, status=status.HTTP_403_FORBIDDEN)
+            if procedure.is_public:
+                pass
+            else:
+                form = Form.objects.get(id=form_id)
+                if not form.procedures.filter(id=procedure.id).exists():
+                    return Response({'error': 'Procedure is not associated with the given form'}, status=status.HTTP_403_FORBIDDEN)
         except Procedure.DoesNotExist:
             return Response({'error': 'Procedure not found'}, status=status.HTTP_404_NOT_FOUND)
         except Form.DoesNotExist:
@@ -291,7 +299,7 @@ class ExecuteProcedureView(APIView):
             if not ProcedureFlag.objects.filter(**filter_kwargs).exists():
                 return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
 
-        if not procedure_name or not parameters :
+        if not procedure_name  :
             return Response({'error': 'Procedure name, parameters, and output parameters are required in the body'}, status=status.HTTP_400_BAD_REQUEST)
 
 
