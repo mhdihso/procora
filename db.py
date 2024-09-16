@@ -6,7 +6,7 @@ db_config = {
     'password': 'Av@B@ck1$',
     'host': '172.16.101.10',
     'port': '1433',
-    'database': 'MainDb',
+    'database': 'DsMaliA',
     'driver': '{ODBC Driver 17 for SQL Server}',
 }
 

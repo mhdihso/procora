@@ -11,6 +11,7 @@ db.sqlite3
 db.sqlite3-journal
 media
 .vscode
+db_connection.py
 
 statics
 static
