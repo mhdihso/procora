@@ -84,10 +84,7 @@ def execute_stored_procedure(proc_name, parameters, procedure):
     dict_output = convert_sql_to_dict(procedure_type_obj.output_part)
 
     param_list = []
-    if procedure.is_get == False:
-        output_param_list = ["CodeOut", "Error", "ErrorDescription"]
-    else:
-        output_param_list = []
+    output_param_list = []
     for param, value in parameters.items():
         if isinstance(value, str):
             value = "N'" + value.replace("'", "''") + "'"
@@ -95,12 +92,13 @@ def execute_stored_procedure(proc_name, parameters, procedure):
             value = "NULL"
         param_list.append(f"@{param} = {value}")
 
-    # for output_param, output_type in dict_output.items():
-    #     output_param_list.append(f"@{output_param} = @{output_param} OUTPUT")
+    if procedure.is_get == False:
+        for output_param in ["CodeOut", "Error", "ErrorDescription"]:
+            output_param_list.append(f"@{output_param} = @{output_param} OUTPUT")
 
     procedure_call = f"{proc_name}\n"
     procedure_call += "    " + ",\n    ".join(param_list)
-    if procedure.is_get==False:
+    if procedure.is_get == False:
         procedure_call += "    " + ",\n    ".join(output_param_list)
     procedure_call = procedure_call + ",\n"
 
