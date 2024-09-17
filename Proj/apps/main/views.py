@@ -100,7 +100,7 @@ def execute_stored_procedure(proc_name, parameters, procedure):
 
     procedure_call = f"{proc_name}\n"
     procedure_call += "    " + ",\n    ".join(param_list)
-    if output_param_list != []:
+    if procedure.is_get==False:
         procedure_call += "    " + ",\n    ".join(output_param_list)
     procedure_call = procedure_call + ",\n"
 
