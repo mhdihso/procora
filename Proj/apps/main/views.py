@@ -115,7 +115,7 @@ def execute_stored_procedure(proc_name, parameters, procedure):
             {procedure_call}
             {procedure_type_obj.second_part} 
         """
-        return sql_script
+        # return sql_script
         cursor.execute(sql_script)
     except:
         sql_script = f"""
@@ -124,7 +124,7 @@ def execute_stored_procedure(proc_name, parameters, procedure):
         {procedure_call[:-2]}
         {procedure_type_obj.second_part} 
     """
-        return sql_script
+        # return sql_script
         cursor.execute(sql_script)
 
     result = cursor.fetchone()
