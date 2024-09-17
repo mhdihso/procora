@@ -129,6 +129,7 @@ def execute_stored_procedure(proc_name, parameters ,procedure):
             return None
 
     else:
+        dict_output=["CodeOut","Error","ErrorDescription"]
         output = {}
         i = 0
         for param in dict_output:
