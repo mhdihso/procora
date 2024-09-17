@@ -81,7 +81,7 @@ def execute_stored_procedure(proc_name, parameters ,procedure):
     if procedure.is_get==False:
         output_param_list = ["CodeOut","Error","ErrorDescription"]
     else: 
-        output_param=[]
+        output_param_list=[]
     for param, value in parameters.items():
         if isinstance(value, str):
             value = "N'" + value.replace("'", "''") + "'"
