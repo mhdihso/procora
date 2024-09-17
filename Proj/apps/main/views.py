@@ -101,7 +101,7 @@ def execute_stored_procedure(proc_name, parameters, procedure):
     if procedure.is_get == False:
         procedure_call = procedure_call + ",\n"
         procedure_call += "    " + ",\n    ".join(output_param_list)
-    procedure_call = procedure_call + ",\n"
+    procedure_call = procedure_call + "\n"
 
     final = ""
     for key, value in dict_output.items():
