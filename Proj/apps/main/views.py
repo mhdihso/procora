@@ -113,6 +113,7 @@ def execute_stored_procedure(proc_name, parameters ,procedure):
         {procedure_type_obj.second_part} 
     """
         cursor.execute(sql_script)
+    return sql_script
     result = cursor.fetchone()
     # print(list(result))
     # output = {param: cursor.fetchone() for param in output_parameters} 
