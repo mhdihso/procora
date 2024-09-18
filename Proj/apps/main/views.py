@@ -135,8 +135,8 @@ def execute_stored_procedure(proc_name, parameters, procedure):
 
     i = 0
     if procedure.is_get:
-        json_string = result[0]
         try:
+            json_string = result[0]
             output = json.loads(json_string)
         except:
             return None
