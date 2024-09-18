@@ -385,6 +385,7 @@ class CompanyCodeListView(generics.ListAPIView):
 class FormListView(generics.ListAPIView):
     queryset = models.Form.objects.all()
     serializer_class = serializers.FormSerializer
+    pagination_class = None
 
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
