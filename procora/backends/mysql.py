@@ -46,6 +46,7 @@ ORDER BY ROUTINE_SCHEMA, ROUTINE_NAME;
 class MySQLBackend(Backend):
     name = "mysql"
     aliases = ("mariadb",)
+    supports_per_borrow_query_timeout = False
 
     def create_connection_factory(
         self,

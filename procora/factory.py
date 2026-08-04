@@ -47,6 +47,15 @@ def connect(
         raise ConfigurationError(
             "Driver options cannot be combined with a custom connection_factory"
         )
+    if (
+        connection_factory is not None
+        and query_timeout
+        and not selected.supports_per_borrow_query_timeout
+    ):
+        raise ConfigurationError(
+            f"{selected.name} query_timeout cannot be applied to connections from a "
+            "custom factory; configure the timeout in the pool"
+        )
     factory = connection_factory or selected.create_connection_factory(
         autocommit=autocommit,
         connect_timeout=connect_timeout,

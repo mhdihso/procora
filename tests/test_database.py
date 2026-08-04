@@ -7,6 +7,7 @@ import pytest
 
 from procora import (
     Backend,
+    ConfigurationError,
     Database,
     DatabaseConnectionError,
     ParameterMode,
@@ -120,6 +121,18 @@ def test_connect_accepts_aliases_and_custom_backend():
     backend = RecordingBackend()
     database = connect(backend, connection_factory=lambda: FakeConnection())
     assert database.backend is backend
+
+
+def test_mysql_custom_factory_rejects_an_unenforceable_query_timeout():
+    with pytest.raises(
+        ConfigurationError,
+        match="configure the timeout in the pool",
+    ):
+        connect(
+            "mysql",
+            connection_factory=lambda: FakeConnection(),
+            query_timeout=5,
+        )
 
 
 def test_connection_releaser_supports_pools():

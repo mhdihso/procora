@@ -52,6 +52,7 @@ class Backend(ABC):
 
     name: str
     aliases: tuple[str, ...] = ()
+    supports_per_borrow_query_timeout: bool = True
 
     @abstractmethod
     def create_connection_factory(
