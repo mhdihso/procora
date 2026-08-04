@@ -84,7 +84,8 @@ would be ambiguous.
 
 ## Tested compatibility
 
-CI exercises Python 3.10–3.14 and installs every optional driver extra independently.
-Its integration services cover PostgreSQL 17, MySQL 8.4, and SQL Server 2022 with ODBC
-Driver 18. Other supported server/driver combinations should be validated before use in
-critical deployments.
+CI exercises Python 3.10–3.14, installs every optional driver extra independently, and
+tests both the exact minimum supported driver set and the newest versions allowed by the
+package constraints. Its integration services cover PostgreSQL 17, MySQL 8.4, and SQL
+Server 2022 with ODBC Driver 18. Other supported server/driver combinations should be
+validated before use in critical deployments.
