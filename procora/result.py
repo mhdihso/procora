@@ -35,13 +35,16 @@ class ProcedureResult:
 
     @property
     def first(self) -> dict[str, Any] | None:
-        rows = self.rows
-        return rows[0] if rows else None
+        if not self.result_sets:
+            return None
+        rows = self.result_sets[0].rows
+        return dict(rows[0]) if rows else None
 
     @property
     def scalar(self) -> Any:
-        row = self.first
-        return next(iter(row.values())) if row else None
+        if not self.result_sets or not self.result_sets[0].rows:
+            return None
+        return next(iter(self.result_sets[0].rows[0].values()), None)
 
     def json(self) -> Any:
         """Decode JSON from the first scalar value."""

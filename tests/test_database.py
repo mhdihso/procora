@@ -187,3 +187,18 @@ def test_result_json_helper():
         (ResultSet(("payload",), ({"payload": '{"ok": true}'},)),),
     )
     assert result.json() == {"ok": True}
+
+
+def test_first_and_scalar_do_not_copy_the_entire_result_set(monkeypatch):
+    procedure = ProcedureInfo("test", "public", "large_result")
+    result = ProcedureResult(
+        procedure,
+        (ResultSet(("value",), tuple({"value": index} for index in range(1_000))),),
+    )
+
+    def fail_if_copied(self):
+        raise AssertionError("as_list copied the complete result set")
+
+    monkeypatch.setattr(ResultSet, "as_list", fail_if_copied)
+    assert result.first == {"value": 0}
+    assert result.scalar == 0
