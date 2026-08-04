@@ -73,7 +73,7 @@ jobs:
         run: >-
           python -m pip install
           'pyodbc==5.2.0'
-          'psycopg[binary]==3.2.0'
+          'psycopg[binary]==3.2.1'
           'mysql-connector-python==9.2.0'
       - if: matrix.driver-set == 'latest'
         run: python -m pip install -e '.[all]'

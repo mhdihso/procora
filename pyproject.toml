@@ -30,11 +30,11 @@ dependencies = []
 
 [project.optional-dependencies]
 sqlserver = ["pyodbc>=5.2"]
-postgresql = ["psycopg[binary]>=3.2"]
+postgresql = ["psycopg[binary]>=3.2.1"]
 mysql = ["mysql-connector-python>=9.2"]
 all = [
   "pyodbc>=5.2",
-  "psycopg[binary]>=3.2",
+  "psycopg[binary]>=3.2.1",
   "mysql-connector-python>=9.2",
 ]
 dev = [
