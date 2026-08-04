@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
 from typing import Any
 
 import pytest
@@ -131,6 +133,29 @@ def test_metadata_cache_has_an_lru_size_limit():
 def test_metadata_cache_options_reject_negative_values(option, value):
     with pytest.raises(ValueError, match=option):
         Database(RecordingBackend(), lambda: FakeConnection(), **{option: value})
+
+
+def test_concurrent_cache_misses_share_one_discovery():
+    discovery_started = Event()
+    allow_discovery = Event()
+
+    class SlowBackend(RecordingBackend):
+        def discover(self, connection, name, schema):
+            discovery_started.set()
+            assert allow_discovery.wait(timeout=5)
+            return super().discover(connection, name, schema)
+
+    backend = SlowBackend()
+    database = Database(backend, FakeConnection)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(database.call, "Work", Input=1)
+        assert discovery_started.wait(timeout=5)
+        second = executor.submit(database.call, "Work", Input=2)
+        allow_discovery.set()
+        assert first.result(timeout=5).scalar == 1
+        assert second.result(timeout=5).scalar == 2
+
+    assert backend.discoveries == [("Work", None)]
 
 
 def test_mapping_parameters_are_case_friendly_and_reject_duplicates():

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Callable, Mapping
-from threading import RLock
+from threading import Event, RLock
 from time import monotonic
 from typing import Any
 from warnings import warn
@@ -118,6 +118,7 @@ class Database:
             OrderedDict()
         )
         self._cache_lock = RLock()
+        self._metadata_inflight: dict[tuple[str, str], Event] = {}
         self.procedures = _ProcedureNamespace(self)
         self.schemas = _SchemaNamespace(self)
 
@@ -218,6 +219,33 @@ class Database:
             self._metadata_cache.move_to_end(cache_key)
             return info
 
+    def _metadata_or_claim_discovery(
+        self,
+        cache_key: tuple[str, str],
+        *,
+        refresh: bool,
+    ) -> tuple[ProcedureInfo | None, Event | None]:
+        while True:
+            cached = self._cached_info(cache_key, refresh=refresh)
+            if cached is not None:
+                return cached, None
+            with self._cache_lock:
+                pending = self._metadata_inflight.get(cache_key)
+                if pending is None:
+                    pending = Event()
+                    self._metadata_inflight[cache_key] = pending
+                    return None, pending
+            pending.wait()
+            refresh = False
+
+    def _finish_discovery(self, cache_key: tuple[str, str], pending: Event | None) -> None:
+        if pending is None:
+            return
+        with self._cache_lock:
+            if self._metadata_inflight.get(cache_key) is pending:
+                del self._metadata_inflight[cache_key]
+            pending.set()
+
     def _discover_and_cache(
         self,
         connection: Any,
@@ -253,7 +281,7 @@ class Database:
     ) -> ProcedureInfo:
         schema_name, procedure_name = _procedure_parts(name, schema)
         cache_key = (schema_name or "", procedure_name)
-        cached = self._cached_info(cache_key, refresh=refresh)
+        cached, pending = self._metadata_or_claim_discovery(cache_key, refresh=refresh)
         if cached is not None:
             return cached
 
@@ -268,6 +296,7 @@ class Database:
                 cache_key,
             )
         finally:
+            self._finish_discovery(cache_key, pending)
             if connection is not None:
                 self._rollback(connection)
                 self._release_safely(connection, prepared_state)
@@ -291,7 +320,7 @@ class Database:
         schema_name, procedure_name = _procedure_parts(name, schema)
         cache_key = (schema_name or "", procedure_name)
         procedure_label = f"{schema_name}.{procedure_name}" if schema_name else procedure_name
-        info = self._cached_info(cache_key, refresh=refresh)
+        info, pending = self._metadata_or_claim_discovery(cache_key, refresh=refresh)
 
         connection = None
         prepared_state = _NOT_PREPARED
@@ -318,6 +347,7 @@ class Database:
                 f"Execution failed for {procedure_label} on {self.backend.name}: {exc}"
             ) from exc
         finally:
+            self._finish_discovery(cache_key, pending)
             if connection is not None:
                 self._release_safely(connection, prepared_state)
 
