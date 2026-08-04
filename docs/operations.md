@@ -1,0 +1,67 @@
+# Connections, transactions, and operational behavior
+
+## Connection ownership
+
+Every public operation borrows one connection. On the first procedure call, metadata
+discovery and execution share that connection. Later calls reuse cached metadata.
+
+Without `connection_releaser`, Procora closes each connection. With a releaser, Procora
+first commits or rolls back as appropriate, restores temporary settings it changed, and
+then invokes the releaser. Cleanup failures emit `RuntimeWarning` or are delivered to
+`on_cleanup_error`.
+
+Read-only operations (`inspect`, `list_procedures`, and `ping`) roll back transactions
+started by catalog or health queries before returning a non-autocommit connection.
+
+## Transaction boundaries
+
+With `autocommit=False`, every successful `call()` commits independently and every
+failed call rolls back. Multiple calls are not one atomic transaction:
+
+```python
+db.call("reserve_stock")  # committed
+db.call("create_order")   # committed separately
+```
+
+Procora does not currently provide a multi-call transaction context.
+
+## Timeout meanings
+
+| Backend | Meaning of `query_timeout` |
+|---|---|
+| PostgreSQL | Server-side `statement_timeout`, transaction-local or restored after use |
+| SQL Server | ODBC driver query timeout, restored after use |
+| MySQL | Connector socket read/write timeouts, configured at connection creation |
+
+MySQL timeouts are network I/O limits, not guaranteed server-side cancellation. A
+custom MySQL factory must configure them in its pool and cannot combine them with
+Procora's `query_timeout` option.
+
+## Result buffering
+
+All result sets are fetched into memory before the cursor and connection are released.
+Keep procedure results bounded. Procora does not currently expose streaming results.
+
+## Metadata visibility
+
+Database accounts need both permission to execute routines and permission to see the
+catalog metadata used for discovery. A login with `EXECUTE` but insufficient metadata
+visibility may receive `ProcedureNotFoundError`.
+
+## Identifier limitations
+
+The string API (`db.call("schema.procedure")`) is canonical. Attribute namespaces are
+convenience syntax and may require `getattr()` for Python keywords or unusual names.
+
+MySQL Connector/Python does not expose an identifier-quoting hook for `callproc()`, so
+the built-in MySQL adapter accepts conventional unquoted identifiers only. PostgreSQL
+uses `current_schema()` for an unqualified name; pass a schema when search-path behavior
+would be ambiguous.
+
+## Tested compatibility
+
+CI exercises Python 3.10–3.14 and installs every optional driver extra independently.
+Its integration services cover PostgreSQL 17, MySQL 8.4, and SQL Server 2022 with ODBC
+Driver 18. Other supported server/driver combinations should be validated before use in
+critical deployments.
+

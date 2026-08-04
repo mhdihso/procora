@@ -258,6 +258,10 @@ More detail is in [backend notes](docs/backends.md).
 The public classes, result fields, methods, and exception hierarchy are listed in the
 [API reference](docs/api.md).
 
+Production connection ownership, transaction boundaries, timeout meanings, buffering,
+permissions, identifiers, and tested versions are covered in the
+[operations guide](docs/operations.md).
+
 ## Testing
 
 ```bash
@@ -284,3 +288,6 @@ export PROCORA_INTEGRATION_POSTGRESQL_OPTIONS='{"dsn":"postgresql://app:secret@l
 export PROCORA_INTEGRATION_MYSQL_OPTIONS='{"host":"localhost","database":"procora_test","user":"root","password":"secret"}'
 pytest -m integration
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the complete development workflow and
+[CHANGELOG.md](CHANGELOG.md) for release history.
