@@ -13,7 +13,7 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -34,7 +34,7 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -48,7 +48,7 @@ jobs:
       matrix:
         extra: [sqlserver, postgresql, mysql, all]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -74,7 +74,7 @@ jobs:
     env:
       PROCORA_INTEGRATION_POSTGRESQL_OPTIONS: '{"dsn":"postgresql://postgres:procora_test@127.0.0.1:5432/procora_test"}'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -100,7 +100,7 @@ jobs:
     env:
       PROCORA_INTEGRATION_MYSQL_OPTIONS: '{"host":"127.0.0.1","port":3306,"database":"procora_test","user":"root","password":"procora_test"}'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -126,7 +126,7 @@ jobs:
     env:
       PROCORA_INTEGRATION_SQLSERVER_OPTIONS: '{"host":"127.0.0.1","port":1433,"database":"master","username":"sa","password":"Procora_Test_42!","driver":"ODBC Driver 18 for SQL Server","trust_server_certificate":true}'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
