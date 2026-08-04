@@ -50,8 +50,9 @@ passed to `connection_releaser` when one is configured.
 | `return_value` | SQL Server integer `RETURN` value; otherwise `None` |
 | `json()` | Decode JSON text stored in `scalar` |
 
-`ResultSet.columns` preserves column order. `ResultSet.rows` is an immutable tuple of
-row dictionaries, while `ResultSet.as_list()` returns a mutable copy.
+`ResultSet.columns` preserves column order. Result rows, output parameters, and metadata
+backend data are exposed as read-only mappings. `ResultSet.as_list()` and `result.rows`
+return mutable dictionary copies.
 
 ## Metadata models
 

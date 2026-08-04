@@ -285,6 +285,31 @@ def test_result_json_helper():
     assert result.json() == {"ok": True}
 
 
+def test_result_and_metadata_mappings_are_read_only():
+    parameter = ProcedureParameter(1, "value", "integer", backend_data={"oid": 23})
+    procedure = ProcedureInfo(
+        "test",
+        "public",
+        "immutable",
+        (parameter,),
+        backend_data={"source": "catalog"},
+    )
+    result = ProcedureResult(
+        procedure,
+        (ResultSet(("value",), ({"value": 1},)),),
+        {"status": "ok"},
+    )
+
+    with pytest.raises(TypeError):
+        result.output["status"] = "changed"
+    with pytest.raises(TypeError):
+        result.result_sets[0].rows[0]["value"] = 2
+    with pytest.raises(TypeError):
+        parameter.backend_data["oid"] = 24
+    with pytest.raises(TypeError):
+        procedure.backend_data["source"] = "changed"
+
+
 def test_first_and_scalar_do_not_copy_the_entire_result_set(monkeypatch):
     procedure = ProcedureInfo("test", "public", "large_result")
     result = ProcedureResult(

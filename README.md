@@ -159,6 +159,10 @@ result.json()        # Decode JSON text from result.scalar
 
 Duplicate column labels are made unique (`Name`, `Name_2`, and so on). Driver-native Python types such as `Decimal`, `date`, `datetime`, `bytes`, and UUID values are preserved.
 
+Procora buffers every returned result set in memory before releasing the connection.
+Use it for bounded procedure results; a streaming API is not currently provided. Stored
+result rows and output mappings are read-only, while `result.rows` returns mutable copies.
+
 ## Live discovery
 
 Procora does not need a local registry:

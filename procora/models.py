@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
+from types import MappingProxyType
 from typing import Any
 
 
@@ -33,6 +34,9 @@ class ProcedureParameter:
     has_default: bool = False
     backend_data: Mapping[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "backend_data", MappingProxyType(dict(self.backend_data)))
+
     @property
     def python_name(self) -> str:
         value = self.name.removeprefix("@")
@@ -49,6 +53,9 @@ class ProcedureInfo:
     parameters: tuple[ProcedureParameter, ...] = ()
     identity: str | int | None = None
     backend_data: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "backend_data", MappingProxyType(dict(self.backend_data)))
 
     @property
     def qualified_name(self) -> str:

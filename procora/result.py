@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import Any
 
 from .models import ProcedureInfo
@@ -14,7 +16,11 @@ class ResultSet:
     """One tabular result set."""
 
     columns: tuple[str, ...]
-    rows: tuple[dict[str, Any], ...]
+    rows: tuple[Mapping[str, Any], ...]
+
+    def __post_init__(self) -> None:
+        readonly_rows = tuple(MappingProxyType(dict(row)) for row in self.rows)
+        object.__setattr__(self, "rows", readonly_rows)
 
     def as_list(self) -> list[dict[str, Any]]:
         return [dict(row) for row in self.rows]
@@ -26,8 +32,11 @@ class ProcedureResult:
 
     procedure: ProcedureInfo
     result_sets: tuple[ResultSet, ...] = ()
-    output: dict[str, Any] = field(default_factory=dict)
+    output: Mapping[str, Any] = field(default_factory=dict)
     return_value: int | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "output", MappingProxyType(dict(self.output)))
 
     @property
     def rows(self) -> list[dict[str, Any]]:
