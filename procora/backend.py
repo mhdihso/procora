@@ -8,10 +8,11 @@ from contextlib import contextmanager, suppress
 from typing import Any
 
 from .models import BackendCapabilities, ProcedureInfo
+from .protocols import ConnectionProtocol
 from .result import ProcedureResult, ResultSet
 
-ConnectionFactory = Callable[[], Any]
-ConnectionReleaser = Callable[[Any], None]
+ConnectionFactory = Callable[[], ConnectionProtocol]
+ConnectionReleaser = Callable[[ConnectionProtocol], None]
 
 
 @contextmanager

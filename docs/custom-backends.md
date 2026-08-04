@@ -2,6 +2,10 @@
 
 A backend translates one database's catalogs and procedure-call protocol into Procora's portable models.
 
+Custom factories can use the exported `ConnectionProtocol` and `CursorProtocol` for
+static typing. They describe the minimum DB-API behavior consumed by the portable core;
+backend-specific drivers may expose additional methods.
+
 ```python
 from collections.abc import Mapping
 from typing import Any

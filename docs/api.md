@@ -92,6 +92,8 @@ Catch `ProcoraError` for every expected library error, or a specific subclass:
 - `ProcedureExecutionError`
 
 `CleanupErrorHandler` is the callback type accepted by `on_cleanup_error`.
+`ConnectionProtocol` and `CursorProtocol` define the structural DB-API contracts for
+typed custom pools and backends.
 
 The original driver exception is retained as `exception.__cause__` when Procora wraps
 an unexpected connection, discovery, or execution failure.

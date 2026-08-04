@@ -18,6 +18,7 @@ from .errors import (
 )
 from .factory import connect, get_backend
 from .models import BackendCapabilities, ParameterMode, ProcedureInfo, ProcedureParameter
+from .protocols import ConnectionProtocol, CursorProtocol
 from .result import ProcedureResult, ResultSet
 
 __all__ = [
@@ -27,7 +28,9 @@ __all__ = [
     "ConfigurationError",
     "CleanupErrorHandler",
     "ConnectionFactory",
+    "ConnectionProtocol",
     "ConnectionReleaser",
+    "CursorProtocol",
     "Database",
     "DatabaseConnectionError",
     "DriverNotInstalledError",
