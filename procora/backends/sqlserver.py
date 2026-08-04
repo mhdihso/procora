@@ -224,8 +224,12 @@ class SQLServerBackend(Backend):
         if state is not None:
             connection.timeout = int(state)
 
+    def resolve_schema(self, connection: Any, schema: str | None) -> str:
+        _ = connection
+        return schema or "dbo"
+
     def discover(self, connection: Any, name: str, schema: str | None) -> ProcedureInfo:
-        schema = schema or "dbo"
+        schema = self.resolve_schema(connection, schema)
         with managed_cursor(connection.cursor()) as cursor:
             cursor.execute(_METADATA_SQL, schema, name)
             rows = cursor.fetchall()

@@ -60,6 +60,14 @@ does not reliably expose T-SQL default expressions in `sys.parameters`; omitted 
 Server inputs are therefore passed to the server, which applies a default or returns its
 native missing-parameter error.
 
+## Schema-aware metadata caching
+
+Before caching an unqualified procedure, PostgreSQL resolves `current_schema()`, MySQL
+resolves `DATABASE()`, and SQL Server resolves `dbo`. The resolved value is part of the
+cache key, so connections with different session defaults cannot share metadata. An
+unqualified `invalidate_metadata()` call removes matching entries across every resolved
+schema; a qualified call removes only its exact entry.
+
 ## Identifier limitations
 
 The string API (`db.call("schema.procedure")`) is canonical. Attribute namespaces are

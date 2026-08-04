@@ -197,6 +197,12 @@ The cache keeps at most 1,024 procedures by default. Dynamic-schema applications
 set `metadata_cache_ttl=300`, adjust `metadata_cache_max_size`, or use size `0` to
 disable metadata storage.
 
+For unqualified calls, built-in backends resolve the active schema/database on the
+borrowed connection before looking in the cache. Metadata from different tenant schemas
+therefore remains isolated even when pooled connections have different session defaults.
+Calling `invalidate_metadata("procedure")` removes that name from every resolved schema;
+pass an explicit schema to remove only one entry.
+
 ## Transactions and timeouts
 
 Autocommit is enabled by default. For explicit per-call commit/rollback:

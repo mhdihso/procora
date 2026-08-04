@@ -40,6 +40,11 @@ class ExampleBackend(Backend):
 
         return factory
 
+    def resolve_schema(self, connection, schema):
+        if schema is not None:
+            return schema
+        return connection.current_schema
+
     def discover(self, connection, name, schema):
         # Query the database catalog here.
         return ProcedureInfo(
@@ -74,4 +79,6 @@ database = connect(
 
 `Database` handles connection ownership or pool release, metadata caching, parameter-name normalization, transaction commit/rollback, errors, and callable namespaces. The backend owns only database-specific discovery and execution.
 
-Override `ping` or `set_query_timeout` when the driver's behavior differs from the DB-API defaults.
+Override `resolve_schema` when an unqualified procedure depends on per-connection state;
+Procora uses its result as the metadata-cache namespace. Override `ping` or
+`set_query_timeout` when the driver's behavior differs from the DB-API defaults.

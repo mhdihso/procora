@@ -128,6 +128,56 @@ def test_metadata_cache_has_an_lru_size_limit():
     assert [name for name, _ in backend.discoveries] == ["First", "Second", "First"]
 
 
+def test_unqualified_metadata_cache_is_partitioned_by_resolved_schema():
+    class SchemaConnection(FakeConnection):
+        def __init__(self, current_schema):
+            super().__init__()
+            self.current_schema = current_schema
+
+    class SchemaAwareBackend(RecordingBackend):
+        def resolve_schema(self, connection, schema):
+            return schema or connection.current_schema
+
+    backend = SchemaAwareBackend()
+    connections = ConnectionQueue(
+        SchemaConnection("tenant_one"),
+        SchemaConnection("tenant_two"),
+        SchemaConnection("tenant_one"),
+    )
+    database = Database(backend, connections)
+
+    assert database.call("Work", Input=1).procedure.schema == "tenant_one"
+    assert database.call("Work", Input=2).procedure.schema == "tenant_two"
+    assert database.call("Work", Input=3).procedure.schema == "tenant_one"
+    assert backend.discoveries == [
+        ("Work", "tenant_one"),
+        ("Work", "tenant_two"),
+    ]
+
+
+def test_unqualified_invalidation_removes_every_resolved_schema_entry():
+    class SchemaConnection(FakeConnection):
+        def __init__(self, current_schema):
+            super().__init__()
+            self.current_schema = current_schema
+
+    class SchemaAwareBackend(RecordingBackend):
+        def resolve_schema(self, connection, schema):
+            return schema or connection.current_schema
+
+    backend = SchemaAwareBackend()
+    database = Database(
+        backend,
+        ConnectionQueue(SchemaConnection("one"), SchemaConnection("two")),
+    )
+    database.call("Work", Input=1)
+    database.call("Work", Input=2)
+
+    assert database.invalidate_metadata("Work") is True
+    assert database.invalidate_metadata("Work") is False
+    assert database.clear_metadata_cache() == 0
+
+
 @pytest.mark.parametrize(
     ("option", "value"),
     [("metadata_cache_ttl", -1), ("metadata_cache_max_size", -1)],

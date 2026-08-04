@@ -100,16 +100,21 @@ class MySQLBackend(Backend):
         # Connector/Python's C extension only accepts these at connect time.
         _ = (connection, seconds)
 
-    def discover(self, connection: Any, name: str, schema: str | None) -> ProcedureInfo:
+    def resolve_schema(self, connection: Any, schema: str | None) -> str:
+        if schema is not None:
+            return schema
         with managed_cursor(connection.cursor()) as cursor:
-            if schema is None:
-                cursor.execute("SELECT DATABASE()")
-                row = cursor.fetchone()
-                schema = row[0] if row else None
-            if not schema:
-                raise ProcedureParameterError(
-                    "MySQL needs a selected database or an explicit schema"
-                )
+            cursor.execute("SELECT DATABASE()")
+            row = cursor.fetchone()
+        if not row or not row[0]:
+            raise ProcedureParameterError(
+                "MySQL needs a selected database or an explicit schema"
+            )
+        return str(row[0])
+
+    def discover(self, connection: Any, name: str, schema: str | None) -> ProcedureInfo:
+        schema = self.resolve_schema(connection, schema)
+        with managed_cursor(connection.cursor()) as cursor:
             cursor.execute(_METADATA_SQL, (schema, name))
             rows = cursor.fetchall()
             if not rows:

@@ -117,11 +117,21 @@ class PostgreSQLBackend(Backend):
                 (str(state),),
             )
 
-    def discover(self, connection: Any, name: str, schema: str | None) -> ProcedureInfo:
+    def resolve_schema(self, connection: Any, schema: str | None) -> str:
+        if schema is not None:
+            return schema
         with managed_cursor(connection.cursor()) as cursor:
-            if schema is None:
-                cursor.execute("SELECT current_schema()")
-                schema = cursor.fetchone()[0]
+            cursor.execute("SELECT current_schema()")
+            row = cursor.fetchone()
+        if not row or not row[0]:
+            raise ProcedureParameterError(
+                "PostgreSQL needs a current schema or an explicit schema"
+            )
+        return str(row[0])
+
+    def discover(self, connection: Any, name: str, schema: str | None) -> ProcedureInfo:
+        schema = self.resolve_schema(connection, schema)
+        with managed_cursor(connection.cursor()) as cursor:
             cursor.execute(_METADATA_SQL, (schema, name))
             rows = cursor.fetchall()
         if not rows:

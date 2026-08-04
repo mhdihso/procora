@@ -203,9 +203,14 @@ class Database:
     def invalidate_metadata(self, name: str, *, schema: str | None = None) -> bool:
         """Remove one procedure from the metadata cache."""
         schema_name, procedure_name = _procedure_parts(name, schema)
-        cache_key = (schema_name or "", procedure_name)
         with self._cache_lock:
-            return self._metadata_cache.pop(cache_key, None) is not None
+            if schema_name is not None:
+                cache_key = (schema_name, procedure_name)
+                return self._metadata_cache.pop(cache_key, None) is not None
+            matching = [key for key in self._metadata_cache if key[1] == procedure_name]
+            for key in matching:
+                del self._metadata_cache[key]
+            return bool(matching)
 
     def clear_metadata_cache(self) -> int:
         """Clear all discovered metadata and return the number of removed entries."""
@@ -289,6 +294,17 @@ class Database:
                     self._metadata_cache.popitem(last=False)
         return info
 
+    def _resolve_schema(self, connection: Any, schema: str | None, name: str) -> str | None:
+        try:
+            return self.backend.resolve_schema(connection, schema)
+        except ProcoraError:
+            raise
+        except Exception as exc:
+            label = f"{schema}.{name}" if schema else name
+            raise ProcedureDiscoveryError(
+                f"Could not resolve the schema for {label} using {self.backend.name}: {exc}"
+            ) from exc
+
     def inspect(
         self,
         name: str,
@@ -297,16 +313,24 @@ class Database:
         refresh: bool = False,
     ) -> ProcedureInfo:
         schema_name, procedure_name = _procedure_parts(name, schema)
-        cache_key = (schema_name or "", procedure_name)
-        cached, pending = self._metadata_or_claim_discovery(cache_key, refresh=refresh)
-        if cached is not None:
-            return cached
-
         connection = None
         prepared_state = _NOT_PREPARED
         connection_healthy = True
+        cache_key: tuple[str, str] | None = None
+        pending: Event | None = None
         try:
-            connection, prepared_state = self._connect()
+            if schema_name is None:
+                connection, prepared_state = self._connect()
+                schema_name = self._resolve_schema(connection, schema_name, procedure_name)
+            cache_key = (schema_name or "", procedure_name)
+            cached, pending = self._metadata_or_claim_discovery(
+                cache_key,
+                refresh=refresh,
+            )
+            if cached is not None:
+                return cached
+            if connection is None:
+                connection, prepared_state = self._connect()
             return self._discover_and_cache(
                 connection,
                 schema_name,
@@ -314,7 +338,8 @@ class Database:
                 cache_key,
             )
         finally:
-            self._finish_discovery(cache_key, pending)
+            if cache_key is not None:
+                self._finish_discovery(cache_key, pending)
             if connection is not None:
                 connection_healthy = self._rollback(connection)
                 self._release_safely(
@@ -340,16 +365,28 @@ class Database:
         if not isinstance(supplied, Mapping):
             raise ProcedureParameterError("parameters must be a mapping")
         schema_name, procedure_name = _procedure_parts(name, schema)
-        cache_key = (schema_name or "", procedure_name)
         procedure_label = f"{schema_name}.{procedure_name}" if schema_name else procedure_name
-        info, pending = self._metadata_or_claim_discovery(cache_key, refresh=refresh)
 
         connection = None
         prepared_state = _NOT_PREPARED
         connection_healthy = True
         commit_in_progress = False
+        cache_key: tuple[str, str] | None = None
+        pending: Event | None = None
         try:
-            connection, prepared_state = self._connect()
+            if schema_name is None:
+                connection, prepared_state = self._connect()
+                schema_name = self._resolve_schema(connection, schema_name, procedure_name)
+                procedure_label = (
+                    f"{schema_name}.{procedure_name}" if schema_name else procedure_name
+                )
+            cache_key = (schema_name or "", procedure_name)
+            info, pending = self._metadata_or_claim_discovery(
+                cache_key,
+                refresh=refresh,
+            )
+            if connection is None:
+                connection, prepared_state = self._connect()
             if info is None:
                 info = self._discover_and_cache(
                     connection,
@@ -378,7 +415,8 @@ class Database:
                 f"Execution failed for {procedure_label} on {self.backend.name}: {exc}"
             ) from exc
         finally:
-            self._finish_discovery(cache_key, pending)
+            if cache_key is not None:
+                self._finish_discovery(cache_key, pending)
             if connection is not None:
                 self._release_safely(
                     connection,
