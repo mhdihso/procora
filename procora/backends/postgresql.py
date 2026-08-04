@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from ..backend import Backend, ConnectionFactory, read_result_sets
+from ..backend import Backend, ConnectionFactory, managed_cursor, read_result_sets
 from ..errors import (
     AmbiguousProcedureError,
     DriverNotInstalledError,
@@ -88,8 +88,7 @@ class PostgreSQLBackend(Backend):
     def prepare_connection(self, connection: Any, query_timeout: int) -> str | None:
         if not query_timeout:
             return None
-        cursor = connection.cursor()
-        try:
+        with managed_cursor(connection.cursor()) as cursor:
             autocommit = connection.autocommit
             if callable(autocommit):
                 autocommit = autocommit()
@@ -102,31 +101,23 @@ class PostgreSQLBackend(Backend):
                 (str(query_timeout * 1000), not autocommit),
             )
             return previous
-        finally:
-            cursor.close()
 
     def reset_connection(self, connection: Any, state: Any) -> None:
         if state is None:
             return
-        cursor = connection.cursor()
-        try:
+        with managed_cursor(connection.cursor()) as cursor:
             cursor.execute(
                 "SELECT pg_catalog.set_config('statement_timeout', %s, false)",
                 (str(state),),
             )
-        finally:
-            cursor.close()
 
     def discover(self, connection: Any, name: str, schema: str | None) -> ProcedureInfo:
-        cursor = connection.cursor()
-        try:
+        with managed_cursor(connection.cursor()) as cursor:
             if schema is None:
                 cursor.execute("SELECT current_schema()")
                 schema = cursor.fetchone()[0]
             cursor.execute(_METADATA_SQL, (schema, name))
             rows = cursor.fetchall()
-        finally:
-            cursor.close()
         if not rows:
             raise ProcedureNotFoundError(f"PostgreSQL procedure does not exist: {schema}.{name}")
         if len(rows) > 1:
@@ -182,12 +173,9 @@ class PostgreSQLBackend(Backend):
         supplied: Mapping[int, Any],
     ) -> ProcedureResult:
         sql, bindings = self._build_call(procedure, supplied)
-        cursor = connection.cursor()
-        try:
+        with managed_cursor(connection.cursor()) as cursor:
             cursor.execute(sql, tuple(bindings))
             result_sets = read_result_sets(cursor)
-        finally:
-            cursor.close()
         outputs = procedure.output_parameters
         if not outputs:
             return ProcedureResult(procedure, result_sets)
@@ -253,9 +241,6 @@ class PostgreSQLBackend(Backend):
         return f"CALL {qualified}({', '.join(arguments)})", bindings
 
     def list_procedures(self, connection: Any) -> list[str]:
-        cursor = connection.cursor()
-        try:
+        with managed_cursor(connection.cursor()) as cursor:
             cursor.execute(_LIST_SQL)
             return [f"{row[0]}.{row[1]}" for row in cursor.fetchall()]
-        finally:
-            cursor.close()

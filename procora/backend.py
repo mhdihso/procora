@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
+from contextlib import contextmanager, suppress
 from typing import Any
 
 from .models import ProcedureInfo
@@ -11,6 +12,19 @@ from .result import ProcedureResult, ResultSet
 
 ConnectionFactory = Callable[[], Any]
 ConnectionReleaser = Callable[[Any], None]
+
+
+@contextmanager
+def managed_cursor(cursor: Any):
+    """Close a cursor without allowing cleanup to mask an active error."""
+    try:
+        yield cursor
+    except BaseException:
+        with suppress(Exception):
+            cursor.close()
+        raise
+    else:
+        cursor.close()
 
 
 def unique_columns(description: Any) -> tuple[str, ...]:
@@ -83,13 +97,10 @@ class Backend(ABC):
         """List callable user procedures."""
 
     def ping(self, connection: Any) -> bool:
-        cursor = connection.cursor()
-        try:
+        with managed_cursor(connection.cursor()) as cursor:
             cursor.execute("SELECT 1")
             row = cursor.fetchone()
             return bool(row and row[0] == 1)
-        finally:
-            cursor.close()
 
     def set_query_timeout(self, connection: Any, seconds: int) -> None:
         """Apply a query timeout when the driver supports it."""

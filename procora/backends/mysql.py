@@ -6,7 +6,7 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
-from ..backend import Backend, ConnectionFactory, unique_columns
+from ..backend import Backend, ConnectionFactory, managed_cursor, unique_columns
 from ..errors import (
     DriverNotInstalledError,
     ProcedureNotFoundError,
@@ -94,8 +94,7 @@ class MySQLBackend(Backend):
         _ = (connection, seconds)
 
     def discover(self, connection: Any, name: str, schema: str | None) -> ProcedureInfo:
-        cursor = connection.cursor()
-        try:
+        with managed_cursor(connection.cursor()) as cursor:
             if schema is None:
                 cursor.execute("SELECT DATABASE()")
                 row = cursor.fetchone()
@@ -112,8 +111,6 @@ class MySQLBackend(Backend):
                 if not exists:
                     raise ProcedureNotFoundError(f"MySQL procedure does not exist: {schema}.{name}")
                 return ProcedureInfo(self.name, str(schema), name)
-        finally:
-            cursor.close()
         mode_map = {
             "IN": ParameterMode.IN,
             "OUT": ParameterMode.OUT,
@@ -158,15 +155,12 @@ class MySQLBackend(Backend):
                 raise ProcedureParameterError(
                     f"MySQL parameter {parameter.python_name} must be supplied"
                 )
-        cursor = connection.cursor()
-        try:
+        with managed_cursor(connection.cursor()) as cursor:
             # Connector/Python's callproc() accepts a database-qualified name but
             # internally derives session-variable names from the unquoted routine.
             qualified = f"{procedure.schema}.{procedure.name}"
             returned = cursor.callproc(qualified, tuple(arguments))
             result_sets = self._stored_result_sets(cursor)
-        finally:
-            cursor.close()
         output = {
             parameter.python_name: returned[parameter.position - 1]
             for parameter in procedure.output_parameters
@@ -177,18 +171,13 @@ class MySQLBackend(Backend):
     def _stored_result_sets(cursor: Any) -> tuple[ResultSet, ...]:
         result_sets = []
         for stored in cursor.stored_results():
-            try:
+            with managed_cursor(stored):
                 columns = unique_columns(stored.description)
                 rows = tuple(dict(zip(columns, row, strict=False)) for row in stored.fetchall())
                 result_sets.append(ResultSet(columns, rows))
-            finally:
-                stored.close()
         return tuple(result_sets)
 
     def list_procedures(self, connection: Any) -> list[str]:
-        cursor = connection.cursor()
-        try:
+        with managed_cursor(connection.cursor()) as cursor:
             cursor.execute(_LIST_SQL)
             return [f"{row[0]}.{row[1]}" for row in cursor.fetchall()]
-        finally:
-            cursor.close()

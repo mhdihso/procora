@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from ..backend import Backend, ConnectionFactory, read_result_sets
+from ..backend import Backend, ConnectionFactory, managed_cursor, read_result_sets
 from ..errors import (
     ConfigurationError,
     DriverNotInstalledError,
@@ -220,12 +220,9 @@ class SQLServerBackend(Backend):
 
     def discover(self, connection: Any, name: str, schema: str | None) -> ProcedureInfo:
         schema = schema or "dbo"
-        cursor = connection.cursor()
-        try:
+        with managed_cursor(connection.cursor()) as cursor:
             cursor.execute(_METADATA_SQL, schema, name)
             rows = cursor.fetchall()
-        finally:
-            cursor.close()
         if not rows:
             raise ProcedureNotFoundError(f"SQL Server procedure does not exist: {schema}.{name}")
         first = rows[0]
@@ -265,12 +262,9 @@ class SQLServerBackend(Backend):
         supplied: Mapping[int, Any],
     ) -> ProcedureResult:
         sql, bindings = self._build_call(procedure, supplied)
-        cursor = connection.cursor()
-        try:
+        with managed_cursor(connection.cursor()) as cursor:
             cursor.execute(sql, *bindings) if bindings else cursor.execute(sql)
             sets = read_result_sets(cursor)
-        finally:
-            cursor.close()
         expected = (_RETURN_COLUMN,) + tuple(
             f"{_OUTPUT_PREFIX}{index}" for index in range(len(procedure.output_parameters))
         )
@@ -328,9 +322,6 @@ class SQLServerBackend(Backend):
         return "\n".join(statements), tuple(bindings)
 
     def list_procedures(self, connection: Any) -> list[str]:
-        cursor = connection.cursor()
-        try:
+        with managed_cursor(connection.cursor()) as cursor:
             cursor.execute(_LIST_SQL)
             return [f"{row[0]}.{row[1]}" for row in cursor.fetchall()]
-        finally:
-            cursor.close()
