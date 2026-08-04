@@ -14,13 +14,19 @@ ConnectionReleaser = Callable[[Any], None]
 
 
 def unique_columns(description: Any) -> tuple[str, ...]:
-    used: dict[str, int] = {}
+    allocated: set[str] = set()
+    counters: dict[str, int] = {}
     columns: list[str] = []
     for index, item in enumerate(description, start=1):
-        original = str(item[0] or f"column_{index}")
-        count = used.get(original, 0) + 1
-        used[original] = count
-        columns.append(original if count == 1 else f"{original}_{count}")
+        base = str(item[0] or f"column_{index}")
+        candidate = base
+        suffix = counters.get(base, 1)
+        while candidate in allocated:
+            suffix += 1
+            candidate = f"{base}_{suffix}"
+        counters[base] = suffix
+        allocated.add(candidate)
+        columns.append(candidate)
     return tuple(columns)
 
 
