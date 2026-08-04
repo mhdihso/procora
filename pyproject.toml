@@ -51,6 +51,7 @@ packages = ["procora"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+markers = ["integration: requires a dedicated disposable database"]
 
 [tool.ruff]
 line-length = 100

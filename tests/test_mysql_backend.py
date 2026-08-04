@@ -27,6 +27,17 @@ def test_mysql_discovers_uses_callproc_and_returns_outputs_and_sets():
     assert stored.closed
 
 
+def test_mysql_accepts_the_new_stored_results_property_form():
+    stored = FakeCursor([(["value"], [(1,)])])
+
+    class PropertyCursor:
+        stored_results = [stored]
+
+    result_sets = MySQLBackend._stored_result_sets(PropertyCursor())
+    assert result_sets[0].as_list() == [{"value": 1}]
+    assert stored.closed
+
+
 def test_mysql_discovers_a_zero_parameter_procedure_from_routines():
     class SequentialCursor(FakeCursor):
         def execute(self, sql, *bindings):

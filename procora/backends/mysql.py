@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from typing import Any
+from warnings import catch_warnings, filterwarnings
 
 from ..backend import Backend, ConnectionFactory, managed_cursor, unique_columns
 from ..errors import (
@@ -170,7 +171,16 @@ class MySQLBackend(Backend):
     @staticmethod
     def _stored_result_sets(cursor: Any) -> tuple[ResultSet, ...]:
         result_sets = []
-        for stored in cursor.stored_results():
+        stored_results = cursor.stored_results
+        if callable(stored_results):
+            with catch_warnings():
+                filterwarnings(
+                    "ignore",
+                    message="Call to deprecated function stored_results.*",
+                    category=DeprecationWarning,
+                )
+                stored_results = stored_results()
+        for stored in stored_results:
             with managed_cursor(stored):
                 columns = unique_columns(stored.description)
                 rows = tuple(dict(zip(columns, row, strict=False)) for row in stored.fetchall())

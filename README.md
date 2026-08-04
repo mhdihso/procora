@@ -275,3 +275,12 @@ export PROCORA_MYSQL_OPTIONS='{"host":"localhost","database":"db","user":"app","
 export PROCORA_SQLSERVER_OPTIONS='{"connection_string":"DRIVER={ODBC Driver 18 for SQL Server};..."}'
 pytest tests/test_live_databases.py
 ```
+
+The end-to-end integration suite creates and drops procedures, so run it only against
+dedicated disposable databases:
+
+```bash
+export PROCORA_INTEGRATION_POSTGRESQL_OPTIONS='{"dsn":"postgresql://app:secret@localhost/procora_test"}'
+export PROCORA_INTEGRATION_MYSQL_OPTIONS='{"host":"localhost","database":"procora_test","user":"root","password":"secret"}'
+pytest -m integration
+```
