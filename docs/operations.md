@@ -11,7 +11,10 @@ then invokes the releaser. Cleanup failures emit `RuntimeWarning` or are deliver
 `on_cleanup_error`.
 
 When a pool can explicitly remove an unhealthy connection, pass its discard callback as
-`connection_discarder`. Procora uses it if timeout/session preparation fails.
+`connection_discarder`. Procora uses it if timeout/session preparation or reset fails,
+if rollback fails, or if a commit error leaves the transaction outcome uncertain. If no
+discard callback exists, Procora closes the unsafe connection rather than passing it to
+the normal releaser.
 
 Read-only operations (`inspect`, `list_procedures`, and `ping`) roll back transactions
 started by catalog or health queries before returning a non-autocommit connection.

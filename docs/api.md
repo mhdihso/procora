@@ -47,7 +47,9 @@ Every operation borrows a new connection. The connection is closed afterward, or
 passed to `connection_releaser` when one is configured.
 
 Pools may also provide `connection_discarder`; Procora uses it when per-connection
-preparation fails, instead of returning a potentially unhealthy connection normally.
+preparation or reset fails, rollback fails, or a commit outcome is uncertain, instead
+of returning a potentially unhealthy connection normally. Without a discard callback,
+Procora closes that connection.
 
 Cleanup failures do not replace a successful procedure result or the original database
 error. By default they emit `RuntimeWarning`; pass `on_cleanup_error=callback` to route

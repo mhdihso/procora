@@ -15,6 +15,7 @@ from procora import (
     DatabaseConnectionError,
     ParameterMode,
     ProcedureDiscoveryError,
+    ProcedureExecutionError,
     ProcedureInfo,
     ProcedureParameter,
     ProcedureParameterError,
@@ -347,7 +348,8 @@ def test_timeout_setup_failure_releases_created_connection():
 
     with pytest.raises(DatabaseConnectionError, match="timeout setup failed"):
         database.ping()
-    assert released == [connection]
+    assert released == []
+    assert connection.closed is True
 
 
 def test_timeout_setup_failure_can_discard_a_broken_pool_connection():
@@ -441,16 +443,95 @@ def test_cleanup_errors_can_be_routed_to_a_callback():
 
     connection = FakeConnection()
     released = []
+    discarded = []
     database = Database(
         BrokenResetBackend(),
         lambda: connection,
         connection_releaser=released.append,
+        connection_discarder=discarded.append,
         on_cleanup_error=cleanup_errors.append,
     )
     assert database.ping() is True
-    assert released == [connection]
+    assert released == []
+    assert discarded == [connection]
     assert len(cleanup_errors) == 1
     assert str(cleanup_errors[0]) == "reset failed"
+
+
+def test_rollback_failure_discards_a_pooled_read_connection():
+    class BrokenRollbackConnection(FakeConnection):
+        def rollback(self):
+            raise RuntimeError("rollback failed")
+
+    connection = BrokenRollbackConnection(autocommit=False)
+    released = []
+    discarded = []
+    cleanup_errors = []
+    database = Database(
+        RecordingBackend(),
+        lambda: connection,
+        autocommit=False,
+        connection_releaser=released.append,
+        connection_discarder=discarded.append,
+        on_cleanup_error=cleanup_errors.append,
+    )
+
+    assert database.ping() is True
+    assert released == []
+    assert discarded == [connection]
+    assert [str(error) for error in cleanup_errors] == ["rollback failed"]
+
+
+def test_rollback_failure_after_execution_error_discards_connection():
+    class FailingBackend(RecordingBackend):
+        def execute(self, connection, procedure, supplied):
+            raise RuntimeError("execution failed")
+
+    class BrokenRollbackConnection(FakeConnection):
+        def rollback(self):
+            raise RuntimeError("rollback failed")
+
+    connection = BrokenRollbackConnection(autocommit=False)
+    released = []
+    discarded = []
+    database = Database(
+        FailingBackend(),
+        lambda: connection,
+        autocommit=False,
+        connection_releaser=released.append,
+        connection_discarder=discarded.append,
+        on_cleanup_error=lambda error: None,
+    )
+
+    with pytest.raises(ProcedureExecutionError, match="execution failed"):
+        database.call("Work", Input=1)
+    assert released == []
+    assert discarded == [connection]
+
+
+def test_uncertain_commit_failure_discards_connection_even_after_rollback():
+    class BrokenCommitConnection(FakeConnection):
+        def commit(self):
+            self.commits += 1
+            raise RuntimeError("commit outcome unknown")
+
+    connection = BrokenCommitConnection(autocommit=False)
+    released = []
+    discarded = []
+    database = Database(
+        RecordingBackend(),
+        lambda: connection,
+        autocommit=False,
+        connection_releaser=released.append,
+        connection_discarder=discarded.append,
+    )
+
+    with pytest.raises(ProcedureExecutionError, match="commit outcome unknown"):
+        database.call("Work", Input=1)
+    assert connection.commits == 1
+    assert connection.rollbacks == 1
+    assert released == []
+    assert discarded == [connection]
 
 
 def test_result_json_helper():

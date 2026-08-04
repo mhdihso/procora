@@ -152,14 +152,19 @@ class Database:
         discard: bool = False,
     ) -> None:
         errors = []
+        must_discard = discard
         try:
             if prepared_state is not _NOT_PREPARED:
                 self.backend.reset_connection(connection, prepared_state)
         except Exception as exc:
             errors.append(exc)
+            must_discard = True
         try:
-            if discard and self._connection_discarder is not None:
-                self._connection_discarder(connection)
+            if must_discard:
+                if self._connection_discarder is not None:
+                    self._connection_discarder(connection)
+                else:
+                    connection.close()
             elif self._connection_releaser is None:
                 connection.close()
             else:
@@ -299,6 +304,7 @@ class Database:
 
         connection = None
         prepared_state = _NOT_PREPARED
+        connection_healthy = True
         try:
             connection, prepared_state = self._connect()
             return self._discover_and_cache(
@@ -310,8 +316,12 @@ class Database:
         finally:
             self._finish_discovery(cache_key, pending)
             if connection is not None:
-                self._rollback(connection)
-                self._release_safely(connection, prepared_state)
+                connection_healthy = self._rollback(connection)
+                self._release_safely(
+                    connection,
+                    prepared_state,
+                    discard=not connection_healthy,
+                )
 
     def call(
         self,
@@ -336,6 +346,8 @@ class Database:
 
         connection = None
         prepared_state = _NOT_PREPARED
+        connection_healthy = True
+        commit_in_progress = False
         try:
             connection, prepared_state = self._connect()
             if info is None:
@@ -348,20 +360,31 @@ class Database:
             normalized = self._normalize_parameters(info, supplied)
             result = self.backend.execute(connection, info, normalized)
             if not self._is_autocommit(connection):
+                commit_in_progress = True
                 connection.commit()
+                commit_in_progress = False
             return result
         except ProcoraError:
-            self._rollback(connection)
+            if not self._rollback(connection):
+                connection_healthy = False
             raise
         except Exception as exc:
-            self._rollback(connection)
+            if commit_in_progress:
+                # A driver error during commit leaves the transaction outcome unknown.
+                connection_healthy = False
+            if not self._rollback(connection):
+                connection_healthy = False
             raise ProcedureExecutionError(
                 f"Execution failed for {procedure_label} on {self.backend.name}: {exc}"
             ) from exc
         finally:
             self._finish_discovery(cache_key, pending)
             if connection is not None:
-                self._release_safely(connection, prepared_state)
+                self._release_safely(
+                    connection,
+                    prepared_state,
+                    discard=not connection_healthy,
+                )
 
     def _normalize_parameters(
         self, info: ProcedureInfo, supplied: Mapping[str, Any]
@@ -416,6 +439,7 @@ class Database:
     def list_procedures(self) -> list[str]:
         connection = None
         prepared_state = _NOT_PREPARED
+        connection_healthy = True
         try:
             connection, prepared_state = self._connect()
             return self.backend.list_procedures(connection)
@@ -427,12 +451,17 @@ class Database:
             ) from exc
         finally:
             if connection is not None:
-                self._rollback(connection)
-                self._release_safely(connection, prepared_state)
+                connection_healthy = self._rollback(connection)
+                self._release_safely(
+                    connection,
+                    prepared_state,
+                    discard=not connection_healthy,
+                )
 
     def ping(self) -> bool:
         connection = None
         prepared_state = _NOT_PREPARED
+        connection_healthy = True
         try:
             connection, prepared_state = self._connect()
             return self.backend.ping(connection)
@@ -444,18 +473,24 @@ class Database:
             ) from exc
         finally:
             if connection is not None:
-                self._rollback(connection)
-                self._release_safely(connection, prepared_state)
+                connection_healthy = self._rollback(connection)
+                self._release_safely(
+                    connection,
+                    prepared_state,
+                    discard=not connection_healthy,
+                )
 
     def _is_autocommit(self, connection: Any) -> bool:
         value = getattr(connection, "autocommit", self.autocommit)
         return bool(value() if callable(value) else value)
 
-    def _rollback(self, connection: Any) -> None:
+    def _rollback(self, connection: Any) -> bool:
         if connection is None:
-            return
+            return True
         try:
             if not self._is_autocommit(connection):
                 connection.rollback()
         except Exception as exc:
             self._report_cleanup_error(exc)
+            return False
+        return True

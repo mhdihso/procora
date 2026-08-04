@@ -224,6 +224,7 @@ db = connect(
     "postgresql",
     connection_factory=my_pool.getconn,
     connection_releaser=my_pool.putconn,
+    connection_discarder=lambda connection: my_pool.putconn(connection, close=True),
 )
 ```
 
@@ -231,6 +232,9 @@ db = connect(
 calls `close()` after each operation. Driver connection options cannot be mixed with
 a custom factory. Before returning a connection, Procora cleans up read transactions
 and restores temporary backend settings it changed.
+Provide `connection_discarder` for production pools. Procora uses it instead of the
+normal releaser after failed session reset or rollback, and when a commit outcome is
+uncertain. If no discard callback exists, Procora closes that unsafe connection.
 
 ## Add another database
 
