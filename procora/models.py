@@ -6,7 +6,21 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Literal
+
+
+@dataclass(frozen=True, slots=True)
+class BackendCapabilities:
+    """Portable behavior advertised by a backend."""
+
+    supports_multiple_result_sets: bool = False
+    supports_output_parameters: bool = False
+    supports_return_value: bool = False
+    supports_overloads: bool = False
+    timeout_kind: Literal["statement", "driver", "socket", "unsupported"] = "unsupported"
+    supports_per_borrow_timeout: bool = True
+    metadata_defaults_are_reliable: bool = False
+    buffers_results: bool = True
 
 
 class ParameterMode(str, Enum):

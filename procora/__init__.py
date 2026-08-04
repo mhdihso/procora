@@ -17,12 +17,13 @@ from .errors import (
     UnsupportedParameterError,
 )
 from .factory import connect, get_backend
-from .models import ParameterMode, ProcedureInfo, ProcedureParameter
+from .models import BackendCapabilities, ParameterMode, ProcedureInfo, ProcedureParameter
 from .result import ProcedureResult, ResultSet
 
 __all__ = [
     "AmbiguousProcedureError",
     "Backend",
+    "BackendCapabilities",
     "ConfigurationError",
     "CleanupErrorHandler",
     "ConnectionFactory",

@@ -7,7 +7,7 @@ from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager, suppress
 from typing import Any
 
-from .models import ProcedureInfo
+from .models import BackendCapabilities, ProcedureInfo
 from .result import ProcedureResult, ResultSet
 
 ConnectionFactory = Callable[[], Any]
@@ -66,7 +66,7 @@ class Backend(ABC):
 
     name: str
     aliases: tuple[str, ...] = ()
-    supports_per_borrow_query_timeout: bool = True
+    capabilities = BackendCapabilities()
 
     @abstractmethod
     def create_connection_factory(

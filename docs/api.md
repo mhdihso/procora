@@ -67,6 +67,10 @@ return mutable dictionary copies.
 Each `ProcedureParameter` provides `position`, `name`, `python_name`, `native_type`,
 `mode`, and `has_default`. `mode` is one of `ParameterMode.IN`, `OUT`, or `INOUT`.
 
+Every backend exposes immutable `BackendCapabilities` through `backend.capabilities`,
+including result-set, output, return-value, overload, timeout, default-metadata, and
+buffering behavior.
+
 ## Exceptions
 
 Catch `ProcoraError` for every expected library error, or a specific subclass:

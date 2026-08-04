@@ -13,7 +13,7 @@ from ..errors import (
     ProcedureParameterError,
     UnsupportedParameterError,
 )
-from ..models import ParameterMode, ProcedureInfo, ProcedureParameter
+from ..models import BackendCapabilities, ParameterMode, ProcedureInfo, ProcedureParameter
 from ..result import ProcedureResult
 
 _METADATA_SQL = """
@@ -58,6 +58,12 @@ def _quote(value: str) -> str:
 class PostgreSQLBackend(Backend):
     name = "postgresql"
     aliases = ("postgres", "psql")
+    capabilities = BackendCapabilities(
+        supports_output_parameters=True,
+        supports_overloads=True,
+        timeout_kind="statement",
+        metadata_defaults_are_reliable=True,
+    )
 
     def create_connection_factory(
         self,

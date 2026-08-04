@@ -14,7 +14,7 @@ from ..errors import (
     ProcedureParameterError,
     UnsupportedParameterError,
 )
-from ..models import ParameterMode, ProcedureInfo, ProcedureParameter
+from ..models import BackendCapabilities, ParameterMode, ProcedureInfo, ProcedureParameter
 from ..result import ProcedureResult, ResultSet
 
 _METADATA_SQL = """
@@ -62,7 +62,13 @@ def _validate_callproc_identifier(value: str, kind: str) -> None:
 class MySQLBackend(Backend):
     name = "mysql"
     aliases = ("mariadb",)
-    supports_per_borrow_query_timeout = False
+    capabilities = BackendCapabilities(
+        supports_multiple_result_sets=True,
+        supports_output_parameters=True,
+        timeout_kind="socket",
+        supports_per_borrow_timeout=False,
+        metadata_defaults_are_reliable=True,
+    )
 
     def create_connection_factory(
         self,

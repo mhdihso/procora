@@ -13,7 +13,7 @@ from ..errors import (
     ProcedureNotFoundError,
     UnsupportedParameterError,
 )
-from ..models import ParameterMode, ProcedureInfo, ProcedureParameter
+from ..models import BackendCapabilities, ParameterMode, ProcedureInfo, ProcedureParameter
 from ..result import ProcedureResult
 
 _METADATA_SQL = """
@@ -177,6 +177,12 @@ def _declaration_type(parameter: ProcedureParameter) -> str:
 class SQLServerBackend(Backend):
     name = "sqlserver"
     aliases = ("mssql", "sql-server")
+    capabilities = BackendCapabilities(
+        supports_multiple_result_sets=True,
+        supports_output_parameters=True,
+        supports_return_value=True,
+        timeout_kind="driver",
+    )
 
     def create_connection_factory(
         self,

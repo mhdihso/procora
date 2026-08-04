@@ -51,7 +51,7 @@ def connect(
     if (
         connection_factory is not None
         and query_timeout
-        and not selected.supports_per_borrow_query_timeout
+        and not selected.capabilities.supports_per_borrow_timeout
     ):
         raise ConfigurationError(
             f"{selected.name} query_timeout cannot be applied to connections from a "

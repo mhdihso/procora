@@ -181,6 +181,21 @@ def test_connect_accepts_aliases_and_custom_backend():
     assert database.backend is backend
 
 
+def test_builtin_backends_advertise_portable_capabilities():
+    sqlserver = get_backend("sqlserver").capabilities
+    postgresql = get_backend("postgresql").capabilities
+    mysql = get_backend("mysql").capabilities
+
+    assert sqlserver.supports_return_value is True
+    assert sqlserver.timeout_kind == "driver"
+    assert sqlserver.metadata_defaults_are_reliable is False
+    assert postgresql.supports_overloads is True
+    assert postgresql.timeout_kind == "statement"
+    assert mysql.supports_per_borrow_timeout is False
+    assert mysql.timeout_kind == "socket"
+    assert all(item.buffers_results for item in (sqlserver, postgresql, mysql))
+
+
 def test_mysql_custom_factory_rejects_an_unenforceable_query_timeout():
     with pytest.raises(
         ConfigurationError,
