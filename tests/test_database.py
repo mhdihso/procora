@@ -187,6 +187,32 @@ def test_timeout_setup_failure_releases_created_connection():
     assert released == [connection]
 
 
+def test_temporary_connection_state_is_reset_before_pool_release():
+    events = []
+
+    class StatefulBackend(RecordingBackend):
+        def prepare_connection(self, connection, query_timeout):
+            events.append(("prepare", query_timeout))
+            return "original-state"
+
+        def reset_connection(self, connection, state):
+            events.append(("reset", state))
+
+    connection = FakeConnection()
+    database = Database(
+        StatefulBackend(),
+        lambda: connection,
+        query_timeout=5,
+        connection_releaser=lambda value: events.append(("release", value)),
+    )
+    assert database.ping() is True
+    assert events == [
+        ("prepare", 5),
+        ("reset", "original-state"),
+        ("release", connection),
+    ]
+
+
 def test_none_from_connection_factory_is_rejected():
     database = Database(RecordingBackend(), lambda: None)
     with pytest.raises(DatabaseConnectionError, match="returned None"):

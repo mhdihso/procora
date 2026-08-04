@@ -64,12 +64,38 @@ def test_postgresql_unnamed_required_parameter_must_be_supplied():
         PostgreSQLBackend._build_call(procedure, {})
 
 
-def test_postgresql_timeout_uses_a_bound_set_config_value():
+def test_postgresql_transaction_timeout_is_local_to_the_operation():
     cursor = FakeCursor([])
-    PostgreSQLBackend().set_query_timeout(FakeConnection(cursor), 12)
+    state = PostgreSQLBackend().prepare_connection(FakeConnection(cursor, autocommit=False), 12)
+    assert state is None
     assert cursor.executions == [
         (
+            "SELECT pg_catalog.set_config('statement_timeout', %s, %s)",
+            (("12000", True),),
+        )
+    ]
+
+
+def test_postgresql_autocommit_timeout_restores_previous_session_value():
+    prepare_cursor = FakeCursor([(["current_setting"], [("5s",)])])
+    reset_cursor = FakeCursor([])
+    connection = FakeConnection(prepare_cursor, reset_cursor, autocommit=True)
+    backend = PostgreSQLBackend()
+
+    state = backend.prepare_connection(connection, 12)
+    backend.reset_connection(connection, state)
+
+    assert state == "5s"
+    assert prepare_cursor.executions == [
+        ("SELECT current_setting('statement_timeout')", ()),
+        (
+            "SELECT pg_catalog.set_config('statement_timeout', %s, %s)",
+            (("12000", False),),
+        ),
+    ]
+    assert reset_cursor.executions == [
+        (
             "SELECT pg_catalog.set_config('statement_timeout', %s, false)",
-            (("12000",),),
+            (("5s",),),
         )
     ]

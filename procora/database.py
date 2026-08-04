@@ -17,6 +17,8 @@ from .errors import (
 from .models import ProcedureInfo, ProcedureParameter
 from .result import ProcedureResult
 
+_NOT_PREPARED = object()
+
 
 def _procedure_parts(name: str, schema: str | None) -> tuple[str | None, str]:
     if not isinstance(name, str) or not name.strip():
@@ -91,33 +93,42 @@ class Database:
         self.procedures = _ProcedureNamespace(self)
         self.schemas = _SchemaNamespace(self)
 
-    def _connect(self) -> Any:
+    def _connect(self) -> tuple[Any, Any]:
         connection = None
+        prepared_state = _NOT_PREPARED
         try:
             connection = self._connection_factory()
             if connection is None:
                 raise DatabaseConnectionError("connection_factory returned None")
-            if self.query_timeout:
-                self.backend.set_query_timeout(connection, self.query_timeout)
-            return connection
+            prepared_state = self.backend.prepare_connection(connection, self.query_timeout)
+            return connection, prepared_state
         except ProcoraError:
             if connection is not None:
                 with suppress(Exception):
-                    self._release(connection)
+                    self._release(connection, prepared_state)
             raise
         except Exception as exc:
             if connection is not None:
                 with suppress(Exception):
-                    self._release(connection)
+                    self._release(connection, prepared_state)
             raise DatabaseConnectionError(
                 f"Could not connect using the {self.backend.name} backend: {exc}"
             ) from exc
 
-    def _release(self, connection: Any) -> None:
-        if self._connection_releaser is None:
-            connection.close()
-        else:
-            self._connection_releaser(connection)
+    def _release(self, connection: Any, prepared_state: Any = _NOT_PREPARED) -> None:
+        reset_error = None
+        try:
+            if prepared_state is not _NOT_PREPARED:
+                self.backend.reset_connection(connection, prepared_state)
+        except Exception as exc:
+            reset_error = exc
+        finally:
+            if self._connection_releaser is None:
+                connection.close()
+            else:
+                self._connection_releaser(connection)
+        if reset_error is not None:
+            raise reset_error
 
     def procedure(self, name: str, *, schema: str | None = None) -> Procedure:
         return Procedure(self, name, schema)
@@ -136,8 +147,9 @@ class Database:
                 return self._metadata_cache[cache_key]
 
         connection = None
+        prepared_state = _NOT_PREPARED
         try:
-            connection = self._connect()
+            connection, prepared_state = self._connect()
             info = self.backend.discover(connection, procedure_name, schema_name)
         except ProcoraError:
             raise
@@ -150,7 +162,7 @@ class Database:
             if connection is not None:
                 self._rollback(connection)
                 with suppress(Exception):
-                    self._release(connection)
+                    self._release(connection, prepared_state)
 
         with self._cache_lock:
             self._metadata_cache[cache_key] = info
@@ -174,8 +186,9 @@ class Database:
         normalized = self._normalize_parameters(info, supplied)
 
         connection = None
+        prepared_state = _NOT_PREPARED
         try:
-            connection = self._connect()
+            connection, prepared_state = self._connect()
             result = self.backend.execute(connection, info, normalized)
             if not self._is_autocommit(connection):
                 connection.commit()
@@ -191,7 +204,7 @@ class Database:
         finally:
             if connection is not None:
                 with suppress(Exception):
-                    self._release(connection)
+                    self._release(connection, prepared_state)
 
     @staticmethod
     def _normalize_parameters(info: ProcedureInfo, supplied: Mapping[str, Any]) -> dict[int, Any]:
@@ -229,8 +242,9 @@ class Database:
 
     def list_procedures(self) -> list[str]:
         connection = None
+        prepared_state = _NOT_PREPARED
         try:
-            connection = self._connect()
+            connection, prepared_state = self._connect()
             return self.backend.list_procedures(connection)
         except ProcoraError:
             raise
@@ -242,12 +256,13 @@ class Database:
             if connection is not None:
                 self._rollback(connection)
                 with suppress(Exception):
-                    self._release(connection)
+                    self._release(connection, prepared_state)
 
     def ping(self) -> bool:
         connection = None
+        prepared_state = _NOT_PREPARED
         try:
-            connection = self._connect()
+            connection, prepared_state = self._connect()
             return self.backend.ping(connection)
         except ProcoraError:
             raise
@@ -259,7 +274,7 @@ class Database:
             if connection is not None:
                 self._rollback(connection)
                 with suppress(Exception):
-                    self._release(connection)
+                    self._release(connection, prepared_state)
 
     def _is_autocommit(self, connection: Any) -> bool:
         value = getattr(connection, "autocommit", self.autocommit)

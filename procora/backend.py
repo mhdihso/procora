@@ -94,3 +94,13 @@ class Backend(ABC):
     def set_query_timeout(self, connection: Any, seconds: int) -> None:
         """Apply a query timeout when the driver supports it."""
         _ = (connection, seconds)
+
+    def prepare_connection(self, connection: Any, query_timeout: int) -> Any:
+        """Apply temporary per-operation settings and return restoration state."""
+        if query_timeout:
+            self.set_query_timeout(connection, query_timeout)
+        return None
+
+    def reset_connection(self, connection: Any, state: Any) -> None:
+        """Restore settings changed by :meth:`prepare_connection`."""
+        _ = (connection, state)

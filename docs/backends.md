@@ -20,7 +20,11 @@ SQL Server reports `OUTPUT` parameters as capable of receiving an initial input.
 
 Character lengths, binary lengths, `max`, decimal precision/scale, temporal scale, and user-defined alias types are reconstructed from catalog metadata for output variables.
 
-Generic cursor output parameters are rejected. Table-valued input support depends on driver-compatible row sequences and the application-specific table type.
+Generic cursor output parameters are rejected. The built-in SQL Server backend does not
+support table-valued parameters; use an application-specific custom backend for them.
+
+Driver-level query timeouts are restored to their previous value before a pooled
+connection is released. Procora does not change the session's `NOCOUNT` setting.
 
 The database principal needs enough metadata visibility to discover the procedure and `EXECUTE` permission to call it.
 
@@ -29,6 +33,10 @@ The database principal needs enough metadata visibility to discover the procedur
 Discovery uses `pg_catalog.pg_proc` and `pg_catalog.pg_namespace`, selecting only stored procedures (`prokind = 'p'`). PostgreSQL functions are deliberately outside Procora's stored-procedure API.
 
 Calls use named notation whenever parameters have names. This allows defaulted input parameters to be omitted while required OUT placeholders are still supplied as `NULL`. PostgreSQL returns OUT/INOUT values as one row; Procora converts that row into `result.output`.
+
+Inside an explicit transaction, `query_timeout` uses a transaction-local
+`statement_timeout` that disappears on commit or rollback. In autocommit mode, Procora
+captures and restores the previous session value before releasing the connection.
 
 PostgreSQL allows overloaded procedures. Procora refuses to guess among multiple routines with the same schema and name. Create a uniquely named wrapper or implement a signature-aware custom backend.
 

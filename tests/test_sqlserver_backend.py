@@ -41,6 +41,7 @@ def test_sqlserver_discovers_executes_and_decodes_every_response():
     assert result.return_value == 0
     sql, bindings = cursor.executions[0]
     assert "EXEC @__procora_return = [dbo].[GetUsers]" in sql
+    assert "NOCOUNT" not in sql
     assert "@UserId = ?" in sql
     assert bindings == (1,)
 
@@ -74,3 +75,13 @@ def test_sqlserver_rejects_table_valued_parameters_explicitly():
     )
     with pytest.raises(UnsupportedParameterError, match="Table-valued"):
         SQLServerBackend._build_call(procedure, {1: [(1,)]})
+
+
+def test_sqlserver_query_timeout_is_restored():
+    backend = SQLServerBackend()
+    connection = FakeConnection()
+    connection.timeout = 30
+    state = backend.prepare_connection(connection, 5)
+    assert connection.timeout == 5
+    backend.reset_connection(connection, state)
+    assert connection.timeout == 30

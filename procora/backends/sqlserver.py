@@ -192,6 +192,17 @@ class SQLServerBackend(Backend):
     def set_query_timeout(self, connection: Any, seconds: int) -> None:
         connection.timeout = seconds
 
+    def prepare_connection(self, connection: Any, query_timeout: int) -> int | None:
+        if not query_timeout:
+            return None
+        previous = int(connection.timeout)
+        connection.timeout = query_timeout
+        return previous
+
+    def reset_connection(self, connection: Any, state: Any) -> None:
+        if state is not None:
+            connection.timeout = int(state)
+
     def discover(self, connection: Any, name: str, schema: str | None) -> ProcedureInfo:
         schema = schema or "dbo"
         cursor = connection.cursor()
@@ -267,7 +278,7 @@ class SQLServerBackend(Backend):
         procedure: ProcedureInfo,
         supplied: Mapping[int, Any],
     ) -> tuple[str, tuple[Any, ...]]:
-        statements = ["SET NOCOUNT ON;", "DECLARE @__procora_return int;"]
+        statements = ["DECLARE @__procora_return int;"]
         assignments = []
         bindings = []
         outputs = procedure.output_parameters

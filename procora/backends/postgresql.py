@@ -84,12 +84,34 @@ class PostgreSQLBackend(Backend):
 
         return factory
 
-    def set_query_timeout(self, connection: Any, seconds: int) -> None:
+    def prepare_connection(self, connection: Any, query_timeout: int) -> str | None:
+        if not query_timeout:
+            return None
+        cursor = connection.cursor()
+        try:
+            autocommit = connection.autocommit
+            if callable(autocommit):
+                autocommit = autocommit()
+            previous = None
+            if autocommit:
+                cursor.execute("SELECT current_setting('statement_timeout')")
+                previous = str(cursor.fetchone()[0])
+            cursor.execute(
+                "SELECT pg_catalog.set_config('statement_timeout', %s, %s)",
+                (str(query_timeout * 1000), not autocommit),
+            )
+            return previous
+        finally:
+            cursor.close()
+
+    def reset_connection(self, connection: Any, state: Any) -> None:
+        if state is None:
+            return
         cursor = connection.cursor()
         try:
             cursor.execute(
                 "SELECT pg_catalog.set_config('statement_timeout', %s, false)",
-                (str(seconds * 1000),),
+                (str(state),),
             )
         finally:
             cursor.close()

@@ -210,7 +210,8 @@ db = connect(
 
 `connection_releaser` returns borrowed connections to the pool. Without it, Procora
 calls `close()` after each operation. Driver connection options cannot be mixed with
-a custom factory.
+a custom factory. Before returning a connection, Procora cleans up read transactions
+and restores temporary backend settings it changed.
 
 ## Add another database
 
