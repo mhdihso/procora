@@ -94,6 +94,42 @@ def test_unknown_parameter_is_rejected_before_execution_connection():
     assert queue.calls == 1
 
 
+def test_pure_out_parameter_rejects_input_before_execution():
+    backend = RecordingBackend()
+    queue = ConnectionQueue(FakeConnection())
+    database = Database(backend, queue)
+    with pytest.raises(ProcedureParameterError, match="OUT-only"):
+        database.call("Work", Output="not allowed")
+    assert queue.calls == 1
+
+
+def test_procedure_proxy_accepts_mapping_for_reserved_parameter_names():
+    class ReservedBackend(RecordingBackend):
+        def discover(self, connection, name, schema):
+            return ProcedureInfo(
+                self.name,
+                schema or "public",
+                name,
+                (
+                    ProcedureParameter(1, "schema", "text"),
+                    ProcedureParameter(2, "refresh", "text"),
+                ),
+            )
+
+        def execute(self, connection, procedure, supplied):
+            return ProcedureResult(
+                procedure,
+                (ResultSet(("values",), ({"values": tuple(supplied.values())},)),),
+            )
+
+    database = Database(
+        ReservedBackend(),
+        ConnectionQueue(FakeConnection(), FakeConnection()),
+    )
+    result = database.procedure("Work")({"schema": "sales", "refresh": "yes"})
+    assert result.scalar == ("sales", "yes")
+
+
 def test_non_autocommit_success_commits_and_failure_rolls_back():
     backend = RecordingBackend()
     discovery = FakeConnection()

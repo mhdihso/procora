@@ -132,6 +132,10 @@ result = db.call("sales.create_order", {"customer_id": 42, "@note": None})
 create_order = db.procedure("sales.create_order")
 result = create_order(customer_id=42)
 
+# Mapping form also works through proxies, including reserved call option names
+special = db.procedure("special_parameter_names")
+result = special({"schema": "procedure-value", "refresh": "procedure-value"})
+
 # Attribute namespaces
 result = db.procedures.daily_maintenance()
 result = db.schemas.sales.create_order(customer_id=42)

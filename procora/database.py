@@ -48,8 +48,20 @@ class Procedure:
     def inspect(self, *, refresh: bool = False) -> ProcedureInfo:
         return self._database.inspect(self.name, schema=self.schema, refresh=refresh)
 
-    def __call__(self, **parameters: Any) -> ProcedureResult:
-        return self._database.call(self.name, schema=self.schema, **parameters)
+    def __call__(
+        self,
+        parameters: Mapping[str, Any] | None = None,
+        *,
+        refresh_metadata: bool = False,
+        **keyword_parameters: Any,
+    ) -> ProcedureResult:
+        return self._database.call(
+            self.name,
+            parameters,
+            schema=self.schema,
+            refresh=refresh_metadata,
+            **keyword_parameters,
+        )
 
 
 class _ProcedureNamespace:
@@ -235,6 +247,11 @@ class Database:
                     f"{info.qualified_name}: {available}"
                 )
                 raise ProcedureParameterError(message)
+            if not parameter.mode.accepts_input:
+                raise ProcedureParameterError(
+                    f"Parameter {parameter.python_name!r} is OUT-only and cannot receive "
+                    "an input value"
+                )
             if parameter.position in normalized:
                 raise ProcedureParameterError(f"Parameter was supplied more than once: {raw_name}")
             normalized[parameter.position] = value

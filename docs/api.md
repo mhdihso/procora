@@ -27,7 +27,9 @@ constructor. A custom factory cannot be combined with driver options.
   procedure metadata.
 - `call(name, parameters=None, *, schema=None, refresh=False, **values) -> ProcedureResult`:
   discover and execute a procedure.
-- `procedure(name, *, schema=None) -> Procedure`: create a reusable callable proxy.
+- `procedure(name, *, schema=None) -> Procedure`: create a reusable callable proxy. The
+  proxy accepts either a parameter mapping or keyword arguments and uses
+  `refresh_metadata=True` to refresh discovery.
 - `procedures.<name>(**values)`: call a procedure in the backend's default schema.
 - `schemas.<schema>.<name>(**values)`: call a schema-qualified procedure.
 
