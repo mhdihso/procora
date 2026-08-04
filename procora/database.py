@@ -22,6 +22,7 @@ from .result import ProcedureResult
 
 _NOT_PREPARED = object()
 CleanupErrorHandler = Callable[[Exception], None]
+DiscoveryClaim = tuple[Event, int, int]
 
 
 def _procedure_parts(name: str, schema: str | None) -> tuple[str | None, str]:
@@ -121,6 +122,8 @@ class Database:
         )
         self._cache_lock = RLock()
         self._metadata_inflight: dict[tuple[str, str], Event] = {}
+        self._cache_generation = 0
+        self._cache_key_generations: dict[tuple[str, str], int] = {}
         self.procedures = _ProcedureNamespace(self)
         self.schemas = _SchemaNamespace(self)
 
@@ -206,17 +209,31 @@ class Database:
         with self._cache_lock:
             if schema_name is not None:
                 cache_key = (schema_name, procedure_name)
-                return self._metadata_cache.pop(cache_key, None) is not None
-            matching = [key for key in self._metadata_cache if key[1] == procedure_name]
+                removed = self._metadata_cache.pop(cache_key, None) is not None
+                self._cache_key_generations[cache_key] = (
+                    self._cache_key_generations.get(cache_key, 0) + 1
+                )
+                return removed
+            matching = {
+                key
+                for key in self._metadata_cache.keys() | self._metadata_inflight.keys()
+                if key[1] == procedure_name
+            }
+            removed = any(key in self._metadata_cache for key in matching)
             for key in matching:
-                del self._metadata_cache[key]
-            return bool(matching)
+                self._metadata_cache.pop(key, None)
+                self._cache_key_generations[key] = (
+                    self._cache_key_generations.get(key, 0) + 1
+                )
+            return removed
 
     def clear_metadata_cache(self) -> int:
         """Clear all discovered metadata and return the number of removed entries."""
         with self._cache_lock:
             count = len(self._metadata_cache)
             self._metadata_cache.clear()
+            self._cache_generation += 1
+            self._cache_key_generations.clear()
             return count
 
     def _cached_info(
@@ -246,7 +263,7 @@ class Database:
         cache_key: tuple[str, str],
         *,
         refresh: bool,
-    ) -> tuple[ProcedureInfo | None, Event | None]:
+    ) -> tuple[ProcedureInfo | None, DiscoveryClaim | None]:
         while True:
             cached = self._cached_info(cache_key, refresh=refresh)
             if cached is not None:
@@ -256,13 +273,22 @@ class Database:
                 if pending is None:
                     pending = Event()
                     self._metadata_inflight[cache_key] = pending
-                    return None, pending
+                    return None, (
+                        pending,
+                        self._cache_generation,
+                        self._cache_key_generations.get(cache_key, 0),
+                    )
             pending.wait()
             refresh = False
 
-    def _finish_discovery(self, cache_key: tuple[str, str], pending: Event | None) -> None:
-        if pending is None:
+    def _finish_discovery(
+        self,
+        cache_key: tuple[str, str],
+        claim: DiscoveryClaim | None,
+    ) -> None:
+        if claim is None:
             return
+        pending = claim[0]
         with self._cache_lock:
             if self._metadata_inflight.get(cache_key) is pending:
                 del self._metadata_inflight[cache_key]
@@ -274,6 +300,7 @@ class Database:
         schema_name: str | None,
         procedure_name: str,
         cache_key: tuple[str, str],
+        claim: DiscoveryClaim,
     ) -> ProcedureInfo:
         try:
             info = self.backend.discover(connection, procedure_name, schema_name)
@@ -286,6 +313,12 @@ class Database:
             ) from exc
         with self._cache_lock:
             if self.metadata_cache_max_size == 0:
+                return info
+            _, global_generation, key_generation = claim
+            if (
+                self._cache_generation != global_generation
+                or self._cache_key_generations.get(cache_key, 0) != key_generation
+            ):
                 return info
             self._metadata_cache[cache_key] = (monotonic(), info)
             self._metadata_cache.move_to_end(cache_key)
@@ -317,13 +350,13 @@ class Database:
         prepared_state = _NOT_PREPARED
         connection_healthy = True
         cache_key: tuple[str, str] | None = None
-        pending: Event | None = None
+        claim: DiscoveryClaim | None = None
         try:
             if schema_name is None:
                 connection, prepared_state = self._connect()
                 schema_name = self._resolve_schema(connection, schema_name, procedure_name)
             cache_key = (schema_name or "", procedure_name)
-            cached, pending = self._metadata_or_claim_discovery(
+            cached, claim = self._metadata_or_claim_discovery(
                 cache_key,
                 refresh=refresh,
             )
@@ -331,15 +364,17 @@ class Database:
                 return cached
             if connection is None:
                 connection, prepared_state = self._connect()
+            assert claim is not None
             return self._discover_and_cache(
                 connection,
                 schema_name,
                 procedure_name,
                 cache_key,
+                claim,
             )
         finally:
             if cache_key is not None:
-                self._finish_discovery(cache_key, pending)
+                self._finish_discovery(cache_key, claim)
             if connection is not None:
                 connection_healthy = self._rollback(connection)
                 self._release_safely(
@@ -372,7 +407,7 @@ class Database:
         connection_healthy = True
         commit_in_progress = False
         cache_key: tuple[str, str] | None = None
-        pending: Event | None = None
+        claim: DiscoveryClaim | None = None
         try:
             if schema_name is None:
                 connection, prepared_state = self._connect()
@@ -381,18 +416,20 @@ class Database:
                     f"{schema_name}.{procedure_name}" if schema_name else procedure_name
                 )
             cache_key = (schema_name or "", procedure_name)
-            info, pending = self._metadata_or_claim_discovery(
+            info, claim = self._metadata_or_claim_discovery(
                 cache_key,
                 refresh=refresh,
             )
             if connection is None:
                 connection, prepared_state = self._connect()
             if info is None:
+                assert claim is not None
                 info = self._discover_and_cache(
                     connection,
                     schema_name,
                     procedure_name,
                     cache_key,
+                    claim,
                 )
             normalized = self._normalize_parameters(info, supplied)
             result = self.backend.execute(connection, info, normalized)
@@ -416,7 +453,7 @@ class Database:
             ) from exc
         finally:
             if cache_key is not None:
-                self._finish_discovery(cache_key, pending)
+                self._finish_discovery(cache_key, claim)
             if connection is not None:
                 self._release_safely(
                     connection,

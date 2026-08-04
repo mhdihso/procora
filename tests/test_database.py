@@ -210,6 +210,52 @@ def test_concurrent_cache_misses_share_one_discovery():
     assert backend.discoveries == [("Work", None)]
 
 
+def test_clear_during_discovery_prevents_stale_metadata_from_being_cached():
+    discovery_started = Event()
+    allow_discovery = Event()
+
+    class SlowBackend(RecordingBackend):
+        def discover(self, connection, name, schema):
+            discovery_started.set()
+            assert allow_discovery.wait(timeout=5)
+            return super().discover(connection, name, schema)
+
+    backend = SlowBackend()
+    database = Database(backend, FakeConnection)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        discovery = executor.submit(database.inspect, "public.Work")
+        assert discovery_started.wait(timeout=5)
+        assert database.clear_metadata_cache() == 0
+        allow_discovery.set()
+        assert discovery.result(timeout=5).qualified_name == "public.Work"
+
+    database.inspect("public.Work")
+    assert backend.discoveries == [("Work", "public"), ("Work", "public")]
+
+
+def test_invalidation_during_discovery_prevents_that_entry_from_being_cached():
+    discovery_started = Event()
+    allow_discovery = Event()
+
+    class SlowBackend(RecordingBackend):
+        def discover(self, connection, name, schema):
+            discovery_started.set()
+            assert allow_discovery.wait(timeout=5)
+            return super().discover(connection, name, schema)
+
+    backend = SlowBackend()
+    database = Database(backend, FakeConnection)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        discovery = executor.submit(database.inspect, "public.Work")
+        assert discovery_started.wait(timeout=5)
+        assert database.invalidate_metadata("public.Work") is False
+        allow_discovery.set()
+        assert discovery.result(timeout=5).qualified_name == "public.Work"
+
+    database.inspect("public.Work")
+    assert backend.discoveries == [("Work", "public"), ("Work", "public")]
+
+
 def test_mapping_parameters_are_case_friendly_and_reject_duplicates():
     backend = RecordingBackend()
     database = Database(backend, ConnectionQueue(FakeConnection()))

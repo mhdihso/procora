@@ -202,6 +202,8 @@ borrowed connection before looking in the cache. Metadata from different tenant 
 therefore remains isolated even when pooled connections have different session defaults.
 Calling `invalidate_metadata("procedure")` removes that name from every resolved schema;
 pass an explicit schema to remove only one entry.
+Invalidation and clearing are generation-safe: metadata discovery that started before
+either operation may finish for its caller, but cannot repopulate the invalidated cache.
 
 ## Transactions and timeouts
 
