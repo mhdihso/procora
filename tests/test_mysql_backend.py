@@ -1,3 +1,5 @@
+from warnings import catch_warnings, simplefilter, warn
+
 import pytest
 
 from procora import ProcedureInfo, UnsupportedParameterError
@@ -36,6 +38,27 @@ def test_mysql_accepts_the_new_stored_results_property_form():
     result_sets = MySQLBackend._stored_result_sets(PropertyCursor())
     assert result_sets[0].as_list() == [{"value": 1}]
     assert stored.closed
+
+
+def test_mysql_suppresses_only_the_known_stored_results_deprecation():
+    stored = FakeCursor([(["value"], [(1,)])])
+
+    class DeprecatedCursor:
+        def stored_results(self):
+            warn(
+                "Call to deprecated function stored_results. It may be removed.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            warn("different driver deprecation", DeprecationWarning, stacklevel=2)
+            return [stored]
+
+    with catch_warnings(record=True) as captured:
+        simplefilter("always")
+        result_sets = MySQLBackend._stored_result_sets(DeprecatedCursor())
+
+    assert result_sets[0].as_list() == [{"value": 1}]
+    assert [str(item.message) for item in captured] == ["different driver deprecation"]
 
 
 def test_mysql_discovers_a_zero_parameter_procedure_from_routines():

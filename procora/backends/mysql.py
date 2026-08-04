@@ -184,6 +184,9 @@ class MySQLBackend(Backend):
         result_sets = []
         stored_results = cursor.stored_results
         if callable(stored_results):
+            # Connector/Python deprecated this call in 9.3 without an equivalent
+            # documented callproc result iterator. Track migration in:
+            # https://github.com/mhdihso/procora/issues/3
             with catch_warnings():
                 filterwarnings(
                     "ignore",

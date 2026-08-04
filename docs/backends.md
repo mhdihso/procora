@@ -55,6 +55,11 @@ If a procedure performs transaction control internally, use `autocommit=True`; P
 
 Discovery uses `information_schema.parameters` and `information_schema.routines`. Execution uses Connector/Python's `callproc`, which returns a modified argument sequence containing OUT and INOUT values. Stored result cursors are converted to portable `ResultSet` objects.
 
+Connector/Python deprecated `stored_results()` in 9.3 without documenting an equivalent
+iterator for `callproc()` result sets. Procora isolates that compatibility call, filters
+only its exact warning, tests current driver releases, and tracks replacement work in
+[issue #3](https://github.com/mhdihso/procora/issues/3).
+
 MySQL calls require all IN and INOUT parameters. Procora automatically supplies `None` placeholders for pure OUT parameters.
 
 The adapter passes a metadata-resolved, schema-qualified procedure name to Connector/Python.
