@@ -65,6 +65,13 @@ def _odbc_value(value: object) -> str:
     return "{" + str(value).replace("}", "}}") + "}"
 
 
+def _boolean_option(values: dict[str, Any], name: str, default: bool) -> bool:
+    value = values.pop(name, default)
+    if not isinstance(value, bool):
+        raise ConfigurationError(f"SQL Server option {name} must be a boolean")
+    return value
+
+
 def _detect_driver() -> str:
     try:
         import pyodbc
@@ -96,11 +103,19 @@ def _connection_string(options: Mapping[str, Any]) -> str:
     database = values.pop("database", None)
     username = values.pop("username", values.pop("user", None))
     password = values.pop("password", None)
-    port = int(values.pop("port", 1433))
+    raw_port = values.pop("port", 1433)
+    try:
+        if isinstance(raw_port, bool):
+            raise ValueError
+        port = int(raw_port)
+    except (TypeError, ValueError) as exc:
+        raise ConfigurationError("SQL Server option port must be an integer") from exc
+    if not 1 <= port <= 65535:
+        raise ConfigurationError("SQL Server option port must be between 1 and 65535")
     driver = values.pop("driver", None) or _detect_driver()
-    trusted = bool(values.pop("trusted_connection", False))
-    encrypt = bool(values.pop("encrypt", True))
-    trust_certificate = bool(values.pop("trust_server_certificate", False))
+    trusted = _boolean_option(values, "trusted_connection", False)
+    encrypt = _boolean_option(values, "encrypt", True)
+    trust_certificate = _boolean_option(values, "trust_server_certificate", False)
     application_name = values.pop("application_name", "procora")
     if values:
         raise ConfigurationError(f"Unknown SQL Server options: {', '.join(sorted(values))}")
@@ -282,6 +297,7 @@ class SQLServerBackend(Backend):
         assignments = []
         bindings = []
         outputs = procedure.output_parameters
+        output_indexes = {parameter.position: index for index, parameter in enumerate(outputs)}
         for index, parameter in enumerate(outputs):
             variable = f"@__procora_out_{index}"
             statements.append(f"DECLARE {variable} {_declaration_type(parameter)};")
@@ -294,7 +310,7 @@ class SQLServerBackend(Backend):
                     f"Table-valued parameter {parameter.name} needs a custom adapter"
                 )
             if parameter.mode.returns_output:
-                index = outputs.index(parameter)
+                index = output_indexes[parameter.position]
                 assignments.append(f"{parameter.name} = @__procora_out_{index} OUTPUT")
             elif parameter.position in supplied:
                 assignments.append(f"{parameter.name} = ?")
