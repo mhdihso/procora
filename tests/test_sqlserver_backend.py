@@ -2,6 +2,7 @@ import pytest
 
 from procora import (
     ConfigurationError,
+    ProcedureExecutionError,
     ProcedureInfo,
     ProcedureParameter,
     UnsupportedParameterError,
@@ -64,6 +65,15 @@ def test_sqlserver_output_can_receive_initial_value_and_values_stay_bound():
     assert bindings == (hostile, 7)
 
 
+def test_sqlserver_requires_its_private_output_marker():
+    backend = SQLServerBackend()
+    procedure = backend.discover(
+        FakeConnection(FakeCursor([([], metadata_rows())])), "GetUsers", "dbo"
+    )
+    with pytest.raises(ProcedureExecutionError, match="output marker"):
+        backend.execute(FakeConnection(FakeCursor([(["value"], [(1,)])])), procedure, {1: 1})
+
+
 def test_sqlserver_rejects_table_valued_parameters_explicitly():
     procedure = ProcedureInfo(
         "sqlserver",
@@ -124,5 +134,94 @@ def test_sqlserver_port_validation_is_consistent(port):
                 "password": "secret",
                 "driver": "ODBC Driver 18 for SQL Server",
                 "port": port,
+            }
+        )
+
+
+def test_sqlserver_connection_factory_builds_and_uses_a_secure_connection_string(
+    monkeypatch,
+):
+    captured = {}
+    sentinel = object()
+
+    def fake_connect(connection_string, **options):
+        captured["connection_string"] = connection_string
+        captured["options"] = options
+        return sentinel
+
+    monkeypatch.setattr("pyodbc.connect", fake_connect)
+    factory = SQLServerBackend().create_connection_factory(
+        autocommit=False,
+        connect_timeout=7,
+        query_timeout=2,
+        options={
+            "host": "database.internal",
+            "database": "app",
+            "username": "user",
+            "password": "secret}",
+            "driver": "ODBC Driver 18 for SQL Server",
+            "encrypt": True,
+            "trust_server_certificate": False,
+            "application_name": "procora-tests",
+        },
+    )
+
+    assert factory() is sentinel
+    assert "SERVER={database.internal,1433}" in captured["connection_string"]
+    assert "PWD={secret}}}" in captured["connection_string"]
+    assert "Encrypt=yes" in captured["connection_string"]
+    assert "TrustServerCertificate=no" in captured["connection_string"]
+    assert captured["options"] == {"autocommit": False, "timeout": 7}
+
+
+@pytest.mark.parametrize(
+    ("options", "message"),
+    [
+        (
+            {"connection_string": "DSN=app", "host": "unexpected"},
+            "cannot be combined",
+        ),
+        (
+            {"host": "localhost", "driver": "ODBC Driver 18 for SQL Server"},
+            "requires host and database",
+        ),
+        (
+            {
+                "host": "localhost",
+                "database": "app",
+                "driver": "ODBC Driver 18 for SQL Server",
+            },
+            "requires username/password",
+        ),
+        (
+            {
+                "host": "localhost",
+                "database": "app",
+                "trusted_connection": True,
+                "driver": "ODBC Driver 18 for SQL Server",
+                "unknown": "value",
+            },
+            "Unknown SQL Server options",
+        ),
+    ],
+)
+def test_sqlserver_connection_configuration_errors_are_explicit(options, message):
+    with pytest.raises(ConfigurationError, match=message):
+        _connection_string(options)
+
+
+def test_sqlserver_accepts_a_raw_connection_string_without_other_options():
+    assert _connection_string({"connection_string": "DSN=procora"}) == "DSN=procora"
+
+
+def test_sqlserver_reports_when_no_supported_odbc_driver_is_installed(monkeypatch):
+    monkeypatch.setattr("pyodbc.drivers", lambda: ["Unrelated Driver"])
+    with pytest.raises(ConfigurationError, match="currently available: Unrelated Driver"):
+        _connection_string(
+            {
+                "host": "localhost",
+                "database": "app",
+                "username": "user",
+                "password": "secret",
             }
         )

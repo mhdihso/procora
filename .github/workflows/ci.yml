@@ -22,7 +22,7 @@ jobs:
       - run: python -m pip install -e '.[all,dev]'
       - run: ruff check procora tests examples
       - run: mypy procora
-      - run: pytest -m 'not integration' --cov=procora --cov-report=term --cov-fail-under=80
+      - run: pytest -m 'not integration' --cov=procora --cov-report=term --cov-fail-under=90
       - run: python -m build
       - run: python -m pip install --force-reinstall --no-deps dist/*.whl
       - run: python -c "import procora; print(procora.__version__)"

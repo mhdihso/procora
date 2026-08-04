@@ -134,6 +134,36 @@ def test_postgresql_outputs_prefer_discovered_column_names():
     assert result.output == {"first": "one", "second": "two"}
 
 
+def test_postgresql_outputs_fall_back_to_catalog_order():
+    row = [
+        (
+            101,
+            "public",
+            "work",
+            ["first", "second"],
+            ["o", "o"],
+            ["text", "text"],
+            0,
+        )
+    ]
+    backend = PostgreSQLBackend()
+    procedure = backend.discover(FakeConnection(FakeCursor([([], row)])), "work", "public")
+    result = backend.execute(
+        FakeConnection(FakeCursor([(["unknown_one", "unknown_two"], [("one", "two")])])),
+        procedure,
+        {},
+    )
+    assert result.output == {"first": "one", "second": "two"}
+
+
+def test_postgresql_missing_output_row_is_an_explicit_error():
+    row = [(101, "public", "work", ["output"], ["o"], ["text"], 0)]
+    backend = PostgreSQLBackend()
+    procedure = backend.discover(FakeConnection(FakeCursor([([], row)])), "work", "public")
+    with pytest.raises(ProcedureParameterError, match="output-parameter row"):
+        backend.execute(FakeConnection(FakeCursor()), procedure, {})
+
+
 def test_postgresql_transaction_timeout_is_local_to_the_operation():
     cursor = FakeCursor([])
     state = PostgreSQLBackend().prepare_connection(FakeConnection(cursor, autocommit=False), 12)
@@ -169,3 +199,41 @@ def test_postgresql_autocommit_timeout_restores_previous_session_value():
             (("5s",),),
         )
     ]
+
+
+@pytest.mark.parametrize(
+    ("options", "expected_dsn"),
+    [
+        ({"dsn": "postgresql://example/app", "application_name": "test"}, "postgresql://example/app"),
+        ({"host": "database.internal", "dbname": "app"}, None),
+    ],
+)
+def test_postgresql_connection_factory_forwards_supported_driver_options(
+    monkeypatch, options, expected_dsn
+):
+    captured = {}
+    sentinel = object()
+
+    def fake_connect(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return sentinel
+
+    monkeypatch.setattr("psycopg.connect", fake_connect)
+    factory = PostgreSQLBackend().create_connection_factory(
+        autocommit=False,
+        connect_timeout=8,
+        query_timeout=3,
+        options=options,
+    )
+
+    assert factory() is sentinel
+    assert captured["args"] == ((expected_dsn,) if expected_dsn else ())
+    assert captured["kwargs"]["autocommit"] is False
+    assert captured["kwargs"]["connect_timeout"] == 8
+
+
+def test_postgresql_schema_resolution_rejects_an_empty_search_path():
+    connection = FakeConnection(FakeCursor([(["current_schema"], [(None,)])]))
+    with pytest.raises(ProcedureParameterError, match="current schema"):
+        PostgreSQLBackend().resolve_schema(connection, None)
