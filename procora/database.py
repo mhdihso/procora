@@ -351,8 +351,9 @@ class Database:
             if connection is not None:
                 self._release_safely(connection, prepared_state)
 
-    @staticmethod
-    def _normalize_parameters(info: ProcedureInfo, supplied: Mapping[str, Any]) -> dict[int, Any]:
+    def _normalize_parameters(
+        self, info: ProcedureInfo, supplied: Mapping[str, Any]
+    ) -> dict[int, Any]:
         if not isinstance(supplied, Mapping):
             raise ProcedureParameterError("parameters must be a mapping")
         exact = {parameter.python_name: parameter for parameter in info.parameters}
@@ -388,6 +389,16 @@ class Database:
             if parameter.position in normalized:
                 raise ProcedureParameterError(f"Parameter was supplied more than once: {raw_name}")
             normalized[parameter.position] = value
+        if self.backend.capabilities.metadata_defaults_are_reliable:
+            missing = [
+                parameter.python_name
+                for parameter in info.input_parameters
+                if not parameter.has_default and parameter.position not in normalized
+            ]
+            if missing:
+                raise ProcedureParameterError(
+                    f"Missing required parameters for {info.qualified_name}: {', '.join(missing)}"
+                )
         return normalized
 
     def list_procedures(self) -> list[str]:

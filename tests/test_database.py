@@ -9,6 +9,7 @@ import pytest
 
 from procora import (
     Backend,
+    BackendCapabilities,
     ConfigurationError,
     Database,
     DatabaseConnectionError,
@@ -184,6 +185,36 @@ def test_pure_out_parameter_rejects_input_before_execution():
     with pytest.raises(ProcedureParameterError, match="OUT-only"):
         database.call("Work", Output="not allowed")
     assert queue.calls == 1
+
+
+def test_reliably_known_required_parameters_are_validated_in_core():
+    class ReliableBackend(RecordingBackend):
+        capabilities = BackendCapabilities(metadata_defaults_are_reliable=True)
+
+    backend = ReliableBackend()
+    database = Database(backend, ConnectionQueue(FakeConnection()))
+    with pytest.raises(ProcedureParameterError, match="Missing required.*Input"):
+        database.call("Work")
+    assert backend.executions == []
+
+
+def test_defaulted_parameters_are_not_reported_as_missing():
+    class DefaultBackend(RecordingBackend):
+        capabilities = BackendCapabilities(metadata_defaults_are_reliable=True)
+
+        def discover(self, connection, name, schema):
+            return ProcedureInfo(
+                self.name,
+                schema or "public",
+                name,
+                (ProcedureParameter(1, "Optional", "text", has_default=True),),
+            )
+
+        def execute(self, connection, procedure, supplied):
+            return ProcedureResult(procedure)
+
+    database = Database(DefaultBackend(), ConnectionQueue(FakeConnection()))
+    assert database.call("Work").output == {}
 
 
 def test_procedure_proxy_accepts_mapping_for_reserved_parameter_names():

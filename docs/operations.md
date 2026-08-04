@@ -48,6 +48,12 @@ Database accounts need both permission to execute routines and permission to see
 catalog metadata used for discovery. A login with `EXECUTE` but insufficient metadata
 visibility may receive `ProcedureNotFoundError`.
 
+Unknown supplied parameters are always rejected. PostgreSQL and MySQL metadata reliably
+identifies required inputs, so Procora rejects missing ones before execution. SQL Server
+does not reliably expose T-SQL default expressions in `sys.parameters`; omitted SQL
+Server inputs are therefore passed to the server, which applies a default or returns its
+native missing-parameter error.
+
 ## Identifier limitations
 
 The string API (`db.call("schema.procedure")`) is canonical. Attribute namespaces are
@@ -64,4 +70,3 @@ CI exercises Python 3.10–3.14 and installs every optional driver extra indepen
 Its integration services cover PostgreSQL 17, MySQL 8.4, and SQL Server 2022 with ODBC
 Driver 18. Other supported server/driver combinations should be validated before use in
 critical deployments.
-
