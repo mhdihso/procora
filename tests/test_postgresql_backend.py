@@ -1,6 +1,10 @@
 import pytest
 
-from procora import AmbiguousProcedureError, ProcedureParameterError
+from procora import (
+    AmbiguousProcedureError,
+    ProcedureParameterError,
+    UnsupportedParameterError,
+)
 from procora.backends.postgresql import PostgreSQLBackend
 
 from .fakes import FakeConnection, FakeCursor
@@ -62,6 +66,72 @@ def test_postgresql_unnamed_required_parameter_must_be_supplied():
     )
     with pytest.raises(ProcedureParameterError, match="must be supplied"):
         PostgreSQLBackend._build_call(procedure, {})
+
+
+def test_postgresql_named_required_parameter_must_be_supplied():
+    row = [(101, "public", "work", ["value"], ["i"], ["integer"], 0)]
+    procedure = PostgreSQLBackend().discover(
+        FakeConnection(FakeCursor([([], row)])), "work", "public"
+    )
+    with pytest.raises(ProcedureParameterError, match="value must be supplied"):
+        PostgreSQLBackend._build_call(procedure, {})
+
+
+def test_postgresql_trailing_unnamed_default_can_be_omitted():
+    row = [(101, "public", "work", None, ["i", "i"], ["integer", "text"], 1)]
+    procedure = PostgreSQLBackend().discover(
+        FakeConnection(FakeCursor([([], row)])), "work", "public"
+    )
+    sql, bindings = PostgreSQLBackend._build_call(procedure, {1: 7})
+    assert sql == 'CALL "public"."work"(%s)'
+    assert bindings == [7]
+
+
+def test_postgresql_unnamed_default_before_output_is_rejected_clearly():
+    row = [
+        (
+            101,
+            "public",
+            "work",
+            None,
+            ["i", "i", "o"],
+            ["integer", "text", "text"],
+            1,
+        )
+    ]
+    procedure = PostgreSQLBackend().discover(
+        FakeConnection(FakeCursor([([], row)])), "work", "public"
+    )
+    with pytest.raises(ProcedureParameterError, match="cannot be omitted"):
+        PostgreSQLBackend._build_call(procedure, {1: 7})
+
+
+def test_postgresql_variadic_parameters_are_rejected():
+    row = [(101, "public", "work", ["values"], ["v"], ["integer[]"], 0)]
+    with pytest.raises(UnsupportedParameterError, match="Variadic"):
+        PostgreSQLBackend().discover(FakeConnection(FakeCursor([([], row)])), "work", "public")
+
+
+def test_postgresql_outputs_prefer_discovered_column_names():
+    row = [
+        (
+            101,
+            "public",
+            "work",
+            ["first", "second"],
+            ["o", "o"],
+            ["text", "text"],
+            0,
+        )
+    ]
+    backend = PostgreSQLBackend()
+    procedure = backend.discover(FakeConnection(FakeCursor([([], row)])), "work", "public")
+    result = backend.execute(
+        FakeConnection(FakeCursor([(["second", "first"], [("two", "one")])])),
+        procedure,
+        {},
+    )
+    assert result.output == {"first": "one", "second": "two"}
 
 
 def test_postgresql_transaction_timeout_is_local_to_the_operation():

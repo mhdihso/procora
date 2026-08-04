@@ -11,6 +11,7 @@ from ..errors import (
     DriverNotInstalledError,
     ProcedureNotFoundError,
     ProcedureParameterError,
+    UnsupportedParameterError,
 )
 from ..models import ParameterMode, ProcedureInfo, ProcedureParameter
 from ..result import ProcedureResult
@@ -141,6 +142,10 @@ class PostgreSQLBackend(Backend):
             modes = ["i"] * len(types)
         if len(names) < len(types):
             names.extend([""] * (len(types) - len(names)))
+        if "v" in modes:
+            raise UnsupportedParameterError(
+                f"Variadic PostgreSQL procedure parameters are not supported: {schema}.{name}"
+            )
         mode_map = {
             "i": ParameterMode.IN,
             "o": ParameterMode.OUT,
@@ -188,8 +193,14 @@ class PostgreSQLBackend(Backend):
             return ProcedureResult(procedure, result_sets)
         if not result_sets or not result_sets[0].rows:
             raise ProcedureParameterError("PostgreSQL did not return its output-parameter row")
-        values = tuple(result_sets[0].rows[0].values())
-        output = {parameter.python_name: values[index] for index, parameter in enumerate(outputs)}
+        row = result_sets[0].rows[0]
+        if all(parameter.python_name in row for parameter in outputs):
+            output = {parameter.python_name: row[parameter.python_name] for parameter in outputs}
+        else:
+            values = tuple(row.values())
+            output = {
+                parameter.python_name: values[index] for index, parameter in enumerate(outputs)
+            }
         return ProcedureResult(procedure, result_sets[1:], output)
 
     @staticmethod
@@ -209,15 +220,31 @@ class PostgreSQLBackend(Backend):
                     arguments.append(f"{label} => %s")
                     bindings.append(supplied[parameter.position])
                 elif not parameter.has_default:
-                    # Omitting it lets PostgreSQL produce its precise missing-argument error.
-                    continue
+                    raise ProcedureParameterError(
+                        f"PostgreSQL parameter {parameter.python_name} must be supplied"
+                    )
         else:
-            for parameter in procedure.parameters:
+            last_argument = -1
+            for index, parameter in enumerate(procedure.parameters):
+                if parameter.mode is ParameterMode.OUT or parameter.position in supplied:
+                    last_argument = index
+                elif not parameter.has_default:
+                    raise ProcedureParameterError(
+                        f"Unnamed PostgreSQL parameter {parameter.position} must be supplied"
+                    )
+            for index, parameter in enumerate(procedure.parameters):
+                if index > last_argument:
+                    break
                 if parameter.mode is ParameterMode.OUT:
                     arguments.append("NULL")
                 elif parameter.position in supplied:
                     arguments.append("%s")
                     bindings.append(supplied[parameter.position])
+                elif parameter.has_default:
+                    raise ProcedureParameterError(
+                        f"Defaulted unnamed PostgreSQL parameter {parameter.position} cannot "
+                        "be omitted before a later argument"
+                    )
                 else:
                     raise ProcedureParameterError(
                         f"Unnamed PostgreSQL parameter {parameter.position} must be supplied"

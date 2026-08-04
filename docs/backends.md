@@ -32,6 +32,10 @@ The database principal needs enough metadata visibility to discover the procedur
 
 Discovery uses `pg_catalog.pg_proc` and `pg_catalog.pg_namespace`, selecting only stored procedures (`prokind = 'p'`). PostgreSQL functions are deliberately outside Procora's stored-procedure API.
 
+When no schema is supplied, discovery intentionally uses only `current_schema()` rather
+than searching every entry in `search_path`. Pass an explicit schema when procedures
+live outside the current schema.
+
 Calls use named notation whenever parameters have names. This allows defaulted input parameters to be omitted while required OUT placeholders are still supplied as `NULL`. PostgreSQL returns OUT/INOUT values as one row; Procora converts that row into `result.output`.
 
 Inside an explicit transaction, `query_timeout` uses a transaction-local
@@ -39,6 +43,11 @@ Inside an explicit transaction, `query_timeout` uses a transaction-local
 captures and restores the previous session value before releasing the connection.
 
 PostgreSQL allows overloaded procedures. Procora refuses to guess among multiple routines with the same schema and name. Create a uniquely named wrapper or implement a signature-aware custom backend.
+
+Variadic procedure parameters are rejected explicitly because Procora does not yet
+provide a portable variadic calling convention. Trailing unnamed default parameters
+can be omitted; an unnamed default before a later argument cannot be represented safely
+and produces a clear parameter error.
 
 If a procedure performs transaction control internally, use `autocommit=True`; PostgreSQL does not allow transaction control inside a procedure called from an existing transaction block.
 
