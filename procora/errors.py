@@ -25,6 +25,10 @@ class AmbiguousProcedureError(ProcoraError, LookupError):
     """More than one routine matches and a signature is required."""
 
 
+class ProcedureDiscoveryError(ProcoraError):
+    """Procedure metadata could not be discovered."""
+
+
 class ProcedureParameterError(ProcoraError, ValueError):
     """Supplied parameters do not match live procedure metadata."""
 

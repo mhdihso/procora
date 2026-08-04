@@ -1,12 +1,13 @@
 """Procora: one Python API for stored procedures across databases."""
 
 from .backend import Backend, ConnectionFactory, ConnectionReleaser
-from .database import Database, Procedure
+from .database import CleanupErrorHandler, Database, Procedure
 from .errors import (
     AmbiguousProcedureError,
     ConfigurationError,
     DatabaseConnectionError,
     DriverNotInstalledError,
+    ProcedureDiscoveryError,
     ProcedureExecutionError,
     ProcedureNotFoundError,
     ProcedureParameterError,
@@ -21,6 +22,7 @@ __all__ = [
     "AmbiguousProcedureError",
     "Backend",
     "ConfigurationError",
+    "CleanupErrorHandler",
     "ConnectionFactory",
     "ConnectionReleaser",
     "Database",
@@ -28,6 +30,7 @@ __all__ = [
     "DriverNotInstalledError",
     "ParameterMode",
     "Procedure",
+    "ProcedureDiscoveryError",
     "ProcedureExecutionError",
     "ProcedureInfo",
     "ProcedureNotFoundError",

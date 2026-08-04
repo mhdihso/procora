@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from contextlib import suppress
+from collections.abc import Callable, Mapping
 from threading import RLock
 from typing import Any
+from warnings import warn
 
 from .backend import Backend, ConnectionFactory, ConnectionReleaser
 from .errors import (
     DatabaseConnectionError,
+    ProcedureDiscoveryError,
     ProcedureExecutionError,
     ProcedureParameterError,
     ProcoraError,
@@ -18,6 +19,7 @@ from .models import ProcedureInfo, ProcedureParameter
 from .result import ProcedureResult
 
 _NOT_PREPARED = object()
+CleanupErrorHandler = Callable[[Exception], None]
 
 
 def _procedure_parts(name: str, schema: str | None) -> tuple[str | None, str]:
@@ -92,6 +94,7 @@ class Database:
         autocommit: bool = True,
         query_timeout: int = 0,
         connection_releaser: ConnectionReleaser | None = None,
+        on_cleanup_error: CleanupErrorHandler | None = None,
     ) -> None:
         if query_timeout < 0:
             raise ValueError("query_timeout cannot be negative")
@@ -100,6 +103,7 @@ class Database:
         self.autocommit = autocommit
         self.query_timeout = query_timeout
         self._connection_releaser = connection_releaser
+        self._on_cleanup_error = on_cleanup_error
         self._metadata_cache: dict[tuple[str, str], ProcedureInfo] = {}
         self._cache_lock = RLock()
         self.procedures = _ProcedureNamespace(self)
@@ -116,31 +120,52 @@ class Database:
             return connection, prepared_state
         except ProcoraError:
             if connection is not None:
-                with suppress(Exception):
-                    self._release(connection, prepared_state)
+                self._release_safely(connection, prepared_state)
             raise
         except Exception as exc:
             if connection is not None:
-                with suppress(Exception):
-                    self._release(connection, prepared_state)
+                self._release_safely(connection, prepared_state)
             raise DatabaseConnectionError(
                 f"Could not connect using the {self.backend.name} backend: {exc}"
             ) from exc
 
     def _release(self, connection: Any, prepared_state: Any = _NOT_PREPARED) -> None:
-        reset_error = None
+        errors = []
         try:
             if prepared_state is not _NOT_PREPARED:
                 self.backend.reset_connection(connection, prepared_state)
         except Exception as exc:
-            reset_error = exc
-        finally:
+            errors.append(exc)
+        try:
             if self._connection_releaser is None:
                 connection.close()
             else:
                 self._connection_releaser(connection)
-        if reset_error is not None:
-            raise reset_error
+        except Exception as exc:
+            errors.append(exc)
+        if errors:
+            if len(errors) > 1:
+                errors[-1].__context__ = errors[0]
+            raise errors[-1]
+
+    def _report_cleanup_error(self, error: Exception) -> None:
+        if self._on_cleanup_error is not None:
+            try:
+                self._on_cleanup_error(error)
+                return
+            except Exception as callback_error:
+                error = callback_error
+        warn(f"Procora connection cleanup failed: {error}", RuntimeWarning, stacklevel=3)
+
+    def _release_safely(
+        self,
+        connection: Any,
+        prepared_state: Any = _NOT_PREPARED,
+    ) -> None:
+        try:
+            self._release(connection, prepared_state)
+        except Exception as exc:
+            self._report_cleanup_error(exc)
 
     def procedure(self, name: str, *, schema: str | None = None) -> Procedure:
         return Procedure(self, name, schema)
@@ -183,7 +208,7 @@ class Database:
             raise
         except Exception as exc:
             label = f"{schema_name}.{procedure_name}" if schema_name else procedure_name
-            raise ProcedureExecutionError(
+            raise ProcedureDiscoveryError(
                 f"Could not inspect {label} using {self.backend.name}: {exc}"
             ) from exc
         with self._cache_lock:
@@ -216,8 +241,7 @@ class Database:
         finally:
             if connection is not None:
                 self._rollback(connection)
-                with suppress(Exception):
-                    self._release(connection, prepared_state)
+                self._release_safely(connection, prepared_state)
 
     def call(
         self,
@@ -265,8 +289,7 @@ class Database:
             ) from exc
         finally:
             if connection is not None:
-                with suppress(Exception):
-                    self._release(connection, prepared_state)
+                self._release_safely(connection, prepared_state)
 
     @staticmethod
     def _normalize_parameters(info: ProcedureInfo, supplied: Mapping[str, Any]) -> dict[int, Any]:
@@ -322,8 +345,7 @@ class Database:
         finally:
             if connection is not None:
                 self._rollback(connection)
-                with suppress(Exception):
-                    self._release(connection, prepared_state)
+                self._release_safely(connection, prepared_state)
 
     def ping(self) -> bool:
         connection = None
@@ -340,8 +362,7 @@ class Database:
         finally:
             if connection is not None:
                 self._rollback(connection)
-                with suppress(Exception):
-                    self._release(connection, prepared_state)
+                self._release_safely(connection, prepared_state)
 
     def _is_autocommit(self, connection: Any) -> bool:
         value = getattr(connection, "autocommit", self.autocommit)
@@ -353,5 +374,5 @@ class Database:
         try:
             if not self._is_autocommit(connection):
                 connection.rollback()
-        except Exception:
-            pass
+        except Exception as exc:
+            self._report_cleanup_error(exc)

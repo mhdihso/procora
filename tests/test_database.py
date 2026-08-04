@@ -11,6 +11,7 @@ from procora import (
     Database,
     DatabaseConnectionError,
     ParameterMode,
+    ProcedureDiscoveryError,
     ProcedureInfo,
     ProcedureParameter,
     ProcedureParameterError,
@@ -274,6 +275,55 @@ def test_none_from_connection_factory_is_rejected():
     database = Database(RecordingBackend(), lambda: None)
     with pytest.raises(DatabaseConnectionError, match="returned None"):
         database.ping()
+
+
+def test_unexpected_metadata_failure_has_a_discovery_error():
+    class BrokenDiscoveryBackend(RecordingBackend):
+        def discover(self, connection, name, schema):
+            raise RuntimeError("catalog unavailable")
+
+    database = Database(BrokenDiscoveryBackend(), lambda: FakeConnection())
+    with pytest.raises(ProcedureDiscoveryError, match="catalog unavailable") as raised:
+        database.inspect("Work")
+    assert isinstance(raised.value.__cause__, RuntimeError)
+
+
+def test_release_failure_is_observable_without_replacing_success():
+    def fail_release(connection):
+        raise RuntimeError("pool release failed")
+
+    database = Database(
+        RecordingBackend(),
+        lambda: FakeConnection(),
+        connection_releaser=fail_release,
+    )
+    with pytest.warns(RuntimeWarning, match="pool release failed"):
+        result = database.call("Work", Input=1)
+    assert result.scalar == 1
+
+
+def test_cleanup_errors_can_be_routed_to_a_callback():
+    cleanup_errors = []
+
+    class BrokenResetBackend(RecordingBackend):
+        def prepare_connection(self, connection, query_timeout):
+            return "state"
+
+        def reset_connection(self, connection, state):
+            raise RuntimeError("reset failed")
+
+    connection = FakeConnection()
+    released = []
+    database = Database(
+        BrokenResetBackend(),
+        lambda: connection,
+        connection_releaser=released.append,
+        on_cleanup_error=cleanup_errors.append,
+    )
+    assert database.ping() is True
+    assert released == [connection]
+    assert len(cleanup_errors) == 1
+    assert str(cleanup_errors[0]) == "reset failed"
 
 
 def test_result_json_helper():

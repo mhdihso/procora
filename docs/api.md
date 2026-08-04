@@ -8,6 +8,7 @@ connect(
     *,
     connection_factory=None,
     connection_releaser=None,
+    on_cleanup_error=None,
     autocommit=True,
     connect_timeout=30,
     query_timeout=0,
@@ -37,6 +38,10 @@ constructor. A custom factory cannot be combined with driver options.
 
 Every operation borrows a new connection. The connection is closed afterward, or
 passed to `connection_releaser` when one is configured.
+
+Cleanup failures do not replace a successful procedure result or the original database
+error. By default they emit `RuntimeWarning`; pass `on_cleanup_error=callback` to route
+them to application logging or monitoring.
 
 ## `ProcedureResult`
 
@@ -71,9 +76,12 @@ Catch `ProcoraError` for every expected library error, or a specific subclass:
 - `DatabaseConnectionError`
 - `ProcedureNotFoundError`
 - `AmbiguousProcedureError`
+- `ProcedureDiscoveryError`
 - `ProcedureParameterError`
 - `UnsupportedParameterError`
 - `ProcedureExecutionError`
+
+`CleanupErrorHandler` is the callback type accepted by `on_cleanup_error`.
 
 The original driver exception is retained as `exception.__cause__` when Procora wraps
 an unexpected connection, discovery, or execution failure.
