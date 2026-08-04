@@ -60,7 +60,7 @@ class RecordingBackend(Backend):
 
 def test_database_neutral_api_cache_namespaces_and_results():
     backend = RecordingBackend()
-    queue = ConnectionQueue(FakeConnection(), FakeConnection(), FakeConnection())
+    queue = ConnectionQueue(FakeConnection(), FakeConnection())
     database = Database(backend, queue)
 
     result = database.procedures.DoWork(Input=7)
@@ -71,13 +71,13 @@ def test_database_neutral_api_cache_namespaces_and_results():
     assert result.scalar == 7
     assert result.output == {"Output": "done"}
     assert second.scalar == 8
-    assert queue.calls == 3  # one discovery and two executions
+    assert queue.calls == 2  # discovery shares the first execution connection
     assert backend.executions[0][1] == {1: 7}
 
 
 def test_mapping_parameters_are_case_friendly_and_reject_duplicates():
     backend = RecordingBackend()
-    database = Database(backend, ConnectionQueue(FakeConnection(), FakeConnection()))
+    database = Database(backend, ConnectionQueue(FakeConnection()))
     assert database.call("Work", {"@input": 2}).scalar == 2
 
     database = Database(backend, ConnectionQueue(FakeConnection()))
@@ -124,7 +124,7 @@ def test_procedure_proxy_accepts_mapping_for_reserved_parameter_names():
 
     database = Database(
         ReservedBackend(),
-        ConnectionQueue(FakeConnection(), FakeConnection()),
+        ConnectionQueue(FakeConnection()),
     )
     result = database.procedure("Work")({"schema": "sales", "refresh": "yes"})
     assert result.scalar == ("sales", "yes")
@@ -132,9 +132,8 @@ def test_procedure_proxy_accepts_mapping_for_reserved_parameter_names():
 
 def test_non_autocommit_success_commits_and_failure_rolls_back():
     backend = RecordingBackend()
-    discovery = FakeConnection()
     execution = FakeConnection(autocommit=False)
-    database = Database(backend, ConnectionQueue(discovery, execution), autocommit=False)
+    database = Database(backend, ConnectionQueue(execution), autocommit=False)
     database.call("Work", Input=1)
     assert execution.commits == 1
 
@@ -142,9 +141,8 @@ def test_non_autocommit_success_commits_and_failure_rolls_back():
         def execute(self, connection, procedure, supplied):
             raise RuntimeError("failure")
 
-    discovery = FakeConnection()
     execution = FakeConnection(autocommit=False)
-    database = Database(FailingBackend(), ConnectionQueue(discovery, execution), autocommit=False)
+    database = Database(FailingBackend(), ConnectionQueue(execution), autocommit=False)
     with pytest.raises(Exception, match="Execution failed"):
         database.call("Work", Input=1)
     assert execution.rollbacks == 1
@@ -173,7 +171,7 @@ def test_mysql_custom_factory_rejects_an_unenforceable_query_timeout():
 
 def test_connection_releaser_supports_pools():
     backend = RecordingBackend()
-    connections = [FakeConnection(), FakeConnection()]
+    connections = [FakeConnection()]
     released = []
     database = connect(
         backend,
@@ -181,7 +179,7 @@ def test_connection_releaser_supports_pools():
         connection_releaser=released.append,
     )
     database.call("Work", Input=1)
-    assert len(released) == 2
+    assert len(released) == 1
     assert all(not connection.closed for connection in released)
 
 

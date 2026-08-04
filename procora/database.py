@@ -145,6 +145,37 @@ class Database:
     def procedure(self, name: str, *, schema: str | None = None) -> Procedure:
         return Procedure(self, name, schema)
 
+    def _cached_info(
+        self,
+        cache_key: tuple[str, str],
+        *,
+        refresh: bool,
+    ) -> ProcedureInfo | None:
+        if refresh:
+            return None
+        with self._cache_lock:
+            return self._metadata_cache.get(cache_key)
+
+    def _discover_and_cache(
+        self,
+        connection: Any,
+        schema_name: str | None,
+        procedure_name: str,
+        cache_key: tuple[str, str],
+    ) -> ProcedureInfo:
+        try:
+            info = self.backend.discover(connection, procedure_name, schema_name)
+        except ProcoraError:
+            raise
+        except Exception as exc:
+            label = f"{schema_name}.{procedure_name}" if schema_name else procedure_name
+            raise ProcedureExecutionError(
+                f"Could not inspect {label} using {self.backend.name}: {exc}"
+            ) from exc
+        with self._cache_lock:
+            self._metadata_cache[cache_key] = info
+        return info
+
     def inspect(
         self,
         name: str,
@@ -154,31 +185,25 @@ class Database:
     ) -> ProcedureInfo:
         schema_name, procedure_name = _procedure_parts(name, schema)
         cache_key = (schema_name or "", procedure_name)
-        with self._cache_lock:
-            if not refresh and cache_key in self._metadata_cache:
-                return self._metadata_cache[cache_key]
+        cached = self._cached_info(cache_key, refresh=refresh)
+        if cached is not None:
+            return cached
 
         connection = None
         prepared_state = _NOT_PREPARED
         try:
             connection, prepared_state = self._connect()
-            info = self.backend.discover(connection, procedure_name, schema_name)
-        except ProcoraError:
-            raise
-        except Exception as exc:
-            label = f"{schema_name}.{procedure_name}" if schema_name else procedure_name
-            raise ProcedureExecutionError(
-                f"Could not inspect {label} using {self.backend.name}: {exc}"
-            ) from exc
+            return self._discover_and_cache(
+                connection,
+                schema_name,
+                procedure_name,
+                cache_key,
+            )
         finally:
             if connection is not None:
                 self._rollback(connection)
                 with suppress(Exception):
                     self._release(connection, prepared_state)
-
-        with self._cache_lock:
-            self._metadata_cache[cache_key] = info
-        return info
 
     def call(
         self,
@@ -194,13 +219,24 @@ class Database:
                 "Pass parameters as a mapping or keyword arguments, not both"
             )
         supplied = parameters if parameters is not None else keyword_parameters
-        info = self.inspect(name, schema=schema, refresh=refresh)
-        normalized = self._normalize_parameters(info, supplied)
+        if not isinstance(supplied, Mapping):
+            raise ProcedureParameterError("parameters must be a mapping")
+        schema_name, procedure_name = _procedure_parts(name, schema)
+        cache_key = (schema_name or "", procedure_name)
+        info = self._cached_info(cache_key, refresh=refresh)
 
         connection = None
         prepared_state = _NOT_PREPARED
         try:
             connection, prepared_state = self._connect()
+            if info is None:
+                info = self._discover_and_cache(
+                    connection,
+                    schema_name,
+                    procedure_name,
+                    cache_key,
+                )
+            normalized = self._normalize_parameters(info, supplied)
             result = self.backend.execute(connection, info, normalized)
             if not self._is_autocommit(connection):
                 connection.commit()
