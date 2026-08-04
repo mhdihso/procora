@@ -182,6 +182,13 @@ Metadata is cached after first use. Refresh it after changing a procedure:
 result = db.call("sales.create_order", refresh=True, customer_id=42)
 ```
 
+After a migration, invalidate one procedure or the complete cache explicitly:
+
+```python
+db.invalidate_metadata("sales.create_order")
+removed_count = db.clear_metadata_cache()
+```
+
 ## Transactions and timeouts
 
 Autocommit is enabled by default. For explicit per-call commit/rollback:

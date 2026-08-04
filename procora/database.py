@@ -145,6 +145,20 @@ class Database:
     def procedure(self, name: str, *, schema: str | None = None) -> Procedure:
         return Procedure(self, name, schema)
 
+    def invalidate_metadata(self, name: str, *, schema: str | None = None) -> bool:
+        """Remove one procedure from the metadata cache."""
+        schema_name, procedure_name = _procedure_parts(name, schema)
+        cache_key = (schema_name or "", procedure_name)
+        with self._cache_lock:
+            return self._metadata_cache.pop(cache_key, None) is not None
+
+    def clear_metadata_cache(self) -> int:
+        """Clear all discovered metadata and return the number of removed entries."""
+        with self._cache_lock:
+            count = len(self._metadata_cache)
+            self._metadata_cache.clear()
+            return count
+
     def _cached_info(
         self,
         cache_key: tuple[str, str],

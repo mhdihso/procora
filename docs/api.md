@@ -25,6 +25,8 @@ constructor. A custom factory cannot be combined with driver options.
 - `list_procedures() -> list[str]`: list user procedures visible to the login.
 - `inspect(name, *, schema=None, refresh=False) -> ProcedureInfo`: discover and cache
   procedure metadata.
+- `invalidate_metadata(name, *, schema=None) -> bool`: remove one cached procedure.
+- `clear_metadata_cache() -> int`: clear the cache and return the number of entries.
 - `call(name, parameters=None, *, schema=None, refresh=False, **values) -> ProcedureResult`:
   discover and execute a procedure.
 - `procedure(name, *, schema=None) -> Procedure`: create a reusable callable proxy. The

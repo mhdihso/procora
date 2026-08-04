@@ -28,11 +28,13 @@ class RecordingBackend(Backend):
 
     def __init__(self) -> None:
         self.executions: list[tuple[ProcedureInfo, Mapping[int, Any]]] = []
+        self.discoveries: list[tuple[str, str | None]] = []
 
     def create_connection_factory(self, **kwargs):
         raise AssertionError("custom connection factory expected")
 
     def discover(self, connection, name, schema):
+        self.discoveries.append((name, schema))
         return ProcedureInfo(
             self.name,
             schema or "public",
@@ -73,6 +75,27 @@ def test_database_neutral_api_cache_namespaces_and_results():
     assert second.scalar == 8
     assert queue.calls == 2  # discovery shares the first execution connection
     assert backend.executions[0][1] == {1: 7}
+
+
+def test_metadata_cache_can_be_invalidated_or_cleared():
+    backend = RecordingBackend()
+    database = Database(
+        backend,
+        ConnectionQueue(FakeConnection(), FakeConnection(), FakeConnection()),
+    )
+
+    database.call("public.Work", Input=1)
+    assert backend.discoveries == [("Work", "public")]
+    assert database.invalidate_metadata("public.Work") is True
+    assert database.invalidate_metadata("public.Work") is False
+
+    database.call("public.Work", Input=2)
+    assert len(backend.discoveries) == 2
+    assert database.clear_metadata_cache() == 1
+    assert database.clear_metadata_cache() == 0
+
+    database.call("public.Work", Input=3)
+    assert len(backend.discoveries) == 3
 
 
 def test_mapping_parameters_are_case_friendly_and_reject_duplicates():
