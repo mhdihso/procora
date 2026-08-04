@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from typing import Any
 
 from ..backend import Backend, ConnectionFactory, unique_columns
-from ..errors import DriverNotInstalledError, ProcedureNotFoundError, ProcedureParameterError
+from ..errors import (
+    DriverNotInstalledError,
+    ProcedureNotFoundError,
+    ProcedureParameterError,
+    UnsupportedParameterError,
+)
 from ..models import ParameterMode, ProcedureInfo, ProcedureParameter
 from ..result import ProcedureResult, ResultSet
 
@@ -41,6 +47,15 @@ WHERE ROUTINE_TYPE = 'PROCEDURE'
   AND ROUTINE_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys')
 ORDER BY ROUTINE_SCHEMA, ROUTINE_NAME;
 """
+
+_CALLPROC_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_$]*$")
+
+
+def _validate_callproc_identifier(value: str, kind: str) -> None:
+    if not _CALLPROC_IDENTIFIER.fullmatch(value):
+        raise UnsupportedParameterError(
+            f"MySQL {kind} {value!r} cannot be represented safely by Connector/Python callproc()"
+        )
 
 
 class MySQLBackend(Backend):
@@ -127,8 +142,14 @@ class MySQLBackend(Backend):
         procedure: ProcedureInfo,
         supplied: Mapping[int, Any],
     ) -> ProcedureResult:
+        _validate_callproc_identifier(procedure.schema, "schema")
+        _validate_callproc_identifier(procedure.name, "procedure")
         arguments = []
         for parameter in procedure.parameters:
+            if parameter.mode is ParameterMode.OUT and parameter.position in supplied:
+                raise ProcedureParameterError(
+                    f"MySQL parameter {parameter.python_name} is OUT-only"
+                )
             if parameter.position in supplied:
                 arguments.append(supplied[parameter.position])
             elif parameter.mode is ParameterMode.OUT:

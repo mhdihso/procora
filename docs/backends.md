@@ -58,6 +58,10 @@ Discovery uses `information_schema.parameters` and `information_schema.routines`
 MySQL calls require all IN and INOUT parameters. Procora automatically supplies `None` placeholders for pure OUT parameters.
 
 The adapter passes a metadata-resolved, schema-qualified procedure name to Connector/Python.
+Connector/Python constructs its `CALL` statement from this name without an identifier
+quoting API, so the built-in adapter accepts conventional unquoted MySQL identifiers
+only. Names containing spaces, hyphens, dots, backticks, or other special characters
+raise `UnsupportedParameterError` instead of producing a cryptic driver error.
 `query_timeout` is applied to Connector/Python's socket read and write timeouts. These
 are network I/O limits, not a server-side statement cancellation guarantee. They require
 Connector/Python 9.2 or newer.

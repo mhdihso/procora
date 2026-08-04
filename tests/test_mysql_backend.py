@@ -1,3 +1,6 @@
+import pytest
+
+from procora import ProcedureInfo, UnsupportedParameterError
 from procora.backends.mysql import MySQLBackend
 
 from .fakes import FakeConnection, FakeCursor
@@ -55,3 +58,18 @@ def test_mysql_timeout_is_applied_when_the_connection_is_created(monkeypatch):
     assert captured["connection_timeout"] == 5
     assert captured["read_timeout"] == 15
     assert captured["write_timeout"] == 15
+
+
+@pytest.mark.parametrize(
+    ("schema", "name"),
+    [
+        ("special-schema", "work"),
+        ("shop", "special procedure"),
+        ("shop", "name.with.dot"),
+        ("shop", "`quoted`"),
+    ],
+)
+def test_mysql_callproc_identifier_limitations_are_explicit(schema, name):
+    procedure = ProcedureInfo("mysql", schema, name)
+    with pytest.raises(UnsupportedParameterError, match="callproc"):
+        MySQLBackend().execute(FakeConnection(FakeCursor()), procedure, {})
