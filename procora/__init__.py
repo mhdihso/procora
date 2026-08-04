@@ -2,7 +2,7 @@
 
 from importlib.metadata import PackageNotFoundError, version
 
-from .backend import Backend, ConnectionFactory, ConnectionReleaser
+from .backend import Backend, ConnectionDiscarder, ConnectionFactory, ConnectionReleaser
 from .database import CleanupErrorHandler, Database, Procedure
 from .errors import (
     AmbiguousProcedureError,
@@ -28,6 +28,7 @@ __all__ = [
     "ConfigurationError",
     "CleanupErrorHandler",
     "ConnectionFactory",
+    "ConnectionDiscarder",
     "ConnectionProtocol",
     "ConnectionReleaser",
     "CursorProtocol",

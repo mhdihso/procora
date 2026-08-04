@@ -13,6 +13,7 @@ from .result import ProcedureResult, ResultSet
 
 ConnectionFactory = Callable[[], ConnectionProtocol]
 ConnectionReleaser = Callable[[ConnectionProtocol], None]
+ConnectionDiscarder = Callable[[ConnectionProtocol], None]
 
 
 @contextmanager

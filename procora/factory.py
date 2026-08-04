@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .backend import Backend, ConnectionFactory, ConnectionReleaser
+from .backend import Backend, ConnectionDiscarder, ConnectionFactory, ConnectionReleaser
 from .database import CleanupErrorHandler, Database
 from .errors import ConfigurationError
 
@@ -32,6 +32,7 @@ def connect(
     *,
     connection_factory: ConnectionFactory | None = None,
     connection_releaser: ConnectionReleaser | None = None,
+    connection_discarder: ConnectionDiscarder | None = None,
     on_cleanup_error: CleanupErrorHandler | None = None,
     autocommit: bool = True,
     connect_timeout: int = 30,
@@ -71,6 +72,7 @@ def connect(
         autocommit=autocommit,
         query_timeout=query_timeout,
         connection_releaser=connection_releaser,
+        connection_discarder=connection_discarder,
         on_cleanup_error=on_cleanup_error,
         metadata_cache_ttl=metadata_cache_ttl,
         metadata_cache_max_size=metadata_cache_max_size,

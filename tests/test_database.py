@@ -350,6 +350,28 @@ def test_timeout_setup_failure_releases_created_connection():
     assert released == [connection]
 
 
+def test_timeout_setup_failure_can_discard_a_broken_pool_connection():
+    class TimeoutBackend(RecordingBackend):
+        def set_query_timeout(self, connection, seconds):
+            raise RuntimeError("timeout setup failed")
+
+    connection = FakeConnection()
+    released = []
+    discarded = []
+    database = Database(
+        TimeoutBackend(),
+        lambda: connection,
+        query_timeout=5,
+        connection_releaser=released.append,
+        connection_discarder=discarded.append,
+    )
+
+    with pytest.raises(DatabaseConnectionError, match="timeout setup failed"):
+        database.ping()
+    assert released == []
+    assert discarded == [connection]
+
+
 def test_temporary_connection_state_is_reset_before_pool_release():
     events = []
 

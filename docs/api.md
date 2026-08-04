@@ -8,6 +8,7 @@ connect(
     *,
     connection_factory=None,
     connection_releaser=None,
+    connection_discarder=None,
     on_cleanup_error=None,
     autocommit=True,
     connect_timeout=30,
@@ -44,6 +45,9 @@ for no size limit, or `metadata_cache_max_size=0` to disable storage.
 
 Every operation borrows a new connection. The connection is closed afterward, or
 passed to `connection_releaser` when one is configured.
+
+Pools may also provide `connection_discarder`; Procora uses it when per-connection
+preparation fails, instead of returning a potentially unhealthy connection normally.
 
 Cleanup failures do not replace a successful procedure result or the original database
 error. By default they emit `RuntimeWarning`; pass `on_cleanup_error=callback` to route

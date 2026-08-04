@@ -9,7 +9,7 @@ from time import monotonic
 from typing import Any
 from warnings import warn
 
-from .backend import Backend, ConnectionFactory, ConnectionReleaser
+from .backend import Backend, ConnectionDiscarder, ConnectionFactory, ConnectionReleaser
 from .errors import (
     DatabaseConnectionError,
     ProcedureDiscoveryError,
@@ -96,6 +96,7 @@ class Database:
         autocommit: bool = True,
         query_timeout: int = 0,
         connection_releaser: ConnectionReleaser | None = None,
+        connection_discarder: ConnectionDiscarder | None = None,
         on_cleanup_error: CleanupErrorHandler | None = None,
         metadata_cache_ttl: float | None = None,
         metadata_cache_max_size: int | None = 1024,
@@ -111,6 +112,7 @@ class Database:
         self.autocommit = autocommit
         self.query_timeout = query_timeout
         self._connection_releaser = connection_releaser
+        self._connection_discarder = connection_discarder
         self._on_cleanup_error = on_cleanup_error
         self.metadata_cache_ttl = metadata_cache_ttl
         self.metadata_cache_max_size = metadata_cache_max_size
@@ -133,16 +135,22 @@ class Database:
             return connection, prepared_state
         except ProcoraError:
             if connection is not None:
-                self._release_safely(connection, prepared_state)
+                self._release_safely(connection, prepared_state, discard=True)
             raise
         except Exception as exc:
             if connection is not None:
-                self._release_safely(connection, prepared_state)
+                self._release_safely(connection, prepared_state, discard=True)
             raise DatabaseConnectionError(
                 f"Could not connect using the {self.backend.name} backend: {exc}"
             ) from exc
 
-    def _release(self, connection: Any, prepared_state: Any = _NOT_PREPARED) -> None:
+    def _release(
+        self,
+        connection: Any,
+        prepared_state: Any = _NOT_PREPARED,
+        *,
+        discard: bool = False,
+    ) -> None:
         errors = []
         try:
             if prepared_state is not _NOT_PREPARED:
@@ -150,7 +158,9 @@ class Database:
         except Exception as exc:
             errors.append(exc)
         try:
-            if self._connection_releaser is None:
+            if discard and self._connection_discarder is not None:
+                self._connection_discarder(connection)
+            elif self._connection_releaser is None:
                 connection.close()
             else:
                 self._connection_releaser(connection)
@@ -174,9 +184,11 @@ class Database:
         self,
         connection: Any,
         prepared_state: Any = _NOT_PREPARED,
+        *,
+        discard: bool = False,
     ) -> None:
         try:
-            self._release(connection, prepared_state)
+            self._release(connection, prepared_state, discard=discard)
         except Exception as exc:
             self._report_cleanup_error(exc)
 
