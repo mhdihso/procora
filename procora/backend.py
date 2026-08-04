@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager, suppress
 from typing import Any
 
@@ -15,7 +15,7 @@ ConnectionReleaser = Callable[[Any], None]
 
 
 @contextmanager
-def managed_cursor(cursor: Any):
+def managed_cursor(cursor: Any) -> Iterator[Any]:
     """Close a cursor without allowing cleanup to mask an active error."""
     try:
         yield cursor

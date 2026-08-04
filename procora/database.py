@@ -261,6 +261,7 @@ class Database:
             raise ProcedureParameterError("parameters must be a mapping")
         schema_name, procedure_name = _procedure_parts(name, schema)
         cache_key = (schema_name or "", procedure_name)
+        procedure_label = f"{schema_name}.{procedure_name}" if schema_name else procedure_name
         info = self._cached_info(cache_key, refresh=refresh)
 
         connection = None
@@ -285,7 +286,7 @@ class Database:
         except Exception as exc:
             self._rollback(connection)
             raise ProcedureExecutionError(
-                f"Execution failed for {info.qualified_name} on {self.backend.name}: {exc}"
+                f"Execution failed for {procedure_label} on {self.backend.name}: {exc}"
             ) from exc
         finally:
             if connection is not None:
@@ -297,8 +298,8 @@ class Database:
             raise ProcedureParameterError("parameters must be a mapping")
         exact = {parameter.python_name: parameter for parameter in info.parameters}
         folded: dict[str, list[ProcedureParameter]] = {}
-        for parameter in info.parameters:
-            folded.setdefault(parameter.python_name.casefold(), []).append(parameter)
+        for item in info.parameters:
+            folded.setdefault(item.python_name.casefold(), []).append(item)
 
         normalized: dict[int, Any] = {}
         for raw_name, value in supplied.items():

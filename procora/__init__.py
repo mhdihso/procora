@@ -1,5 +1,7 @@
 """Procora: one Python API for stored procedures across databases."""
 
+from importlib.metadata import PackageNotFoundError, version
+
 from .backend import Backend, ConnectionFactory, ConnectionReleaser
 from .database import CleanupErrorHandler, Database, Procedure
 from .errors import (
@@ -44,4 +46,7 @@ __all__ = [
     "get_backend",
 ]
 
-__version__ = "1.0.0"
+try:
+    __version__ = version("procora")
+except PackageNotFoundError:  # Source tree used without installation.
+    __version__ = "0+unknown"
