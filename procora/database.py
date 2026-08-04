@@ -92,14 +92,23 @@ class Database:
         self.schemas = _SchemaNamespace(self)
 
     def _connect(self) -> Any:
+        connection = None
         try:
             connection = self._connection_factory()
+            if connection is None:
+                raise DatabaseConnectionError("connection_factory returned None")
             if self.query_timeout:
                 self.backend.set_query_timeout(connection, self.query_timeout)
             return connection
         except ProcoraError:
+            if connection is not None:
+                with suppress(Exception):
+                    self._release(connection)
             raise
         except Exception as exc:
+            if connection is not None:
+                with suppress(Exception):
+                    self._release(connection)
             raise DatabaseConnectionError(
                 f"Could not connect using the {self.backend.name} backend: {exc}"
             ) from exc
@@ -139,6 +148,7 @@ class Database:
             ) from exc
         finally:
             if connection is not None:
+                self._rollback(connection)
                 with suppress(Exception):
                     self._release(connection)
 
@@ -230,6 +240,7 @@ class Database:
             ) from exc
         finally:
             if connection is not None:
+                self._rollback(connection)
                 with suppress(Exception):
                     self._release(connection)
 
@@ -246,6 +257,7 @@ class Database:
             ) from exc
         finally:
             if connection is not None:
+                self._rollback(connection)
                 with suppress(Exception):
                     self._release(connection)
 
@@ -254,6 +266,10 @@ class Database:
         return bool(value() if callable(value) else value)
 
     def _rollback(self, connection: Any) -> None:
-        if connection is not None and not self._is_autocommit(connection):
-            with suppress(Exception):
+        if connection is None:
+            return
+        try:
+            if not self._is_autocommit(connection):
                 connection.rollback()
+        except Exception:
+            pass

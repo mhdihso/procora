@@ -8,6 +8,7 @@ import pytest
 from procora import (
     Backend,
     Database,
+    DatabaseConnectionError,
     ParameterMode,
     ProcedureInfo,
     ProcedureParameter,
@@ -51,6 +52,9 @@ class RecordingBackend(Backend):
 
     def list_procedures(self, connection):
         return ["public.One"]
+
+    def ping(self, connection):
+        return True
 
 
 def test_database_neutral_api_cache_namespaces_and_results():
@@ -130,6 +134,50 @@ def test_connection_releaser_supports_pools():
     database.call("Work", Input=1)
     assert len(released) == 2
     assert all(not connection.closed for connection in released)
+
+
+def test_pooled_read_operations_rollback_before_release():
+    backend = RecordingBackend()
+    connections = [FakeConnection(autocommit=False) for _ in range(3)]
+    released = []
+    database = connect(
+        backend,
+        connection_factory=lambda: connections[len(released)],
+        connection_releaser=released.append,
+        autocommit=False,
+    )
+
+    database.inspect("Work")
+    database.list_procedures()
+    assert database.ping() is True
+
+    assert released == connections
+    assert [connection.rollbacks for connection in released] == [1, 1, 1]
+
+
+def test_timeout_setup_failure_releases_created_connection():
+    class TimeoutBackend(RecordingBackend):
+        def set_query_timeout(self, connection, seconds):
+            raise RuntimeError("timeout setup failed")
+
+    connection = FakeConnection()
+    released = []
+    database = Database(
+        TimeoutBackend(),
+        lambda: connection,
+        query_timeout=5,
+        connection_releaser=released.append,
+    )
+
+    with pytest.raises(DatabaseConnectionError, match="timeout setup failed"):
+        database.ping()
+    assert released == [connection]
+
+
+def test_none_from_connection_factory_is_rejected():
+    database = Database(RecordingBackend(), lambda: None)
+    with pytest.raises(DatabaseConnectionError, match="returned None"):
+        database.ping()
 
 
 def test_result_json_helper():
