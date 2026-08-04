@@ -1,0 +1,59 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "procora"
+version = "1.0.0"
+description = "Call stored procedures across SQL Server, PostgreSQL, and MySQL."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Procora contributors" }]
+keywords = ["stored-procedure", "database", "sql-server", "postgresql", "mysql"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Database",
+]
+dependencies = []
+
+[project.optional-dependencies]
+sqlserver = ["pyodbc>=5.2"]
+postgresql = ["psycopg[binary]>=3.2"]
+mysql = ["mysql-connector-python>=9.0"]
+all = [
+  "pyodbc>=5.2",
+  "psycopg[binary]>=3.2",
+  "mysql-connector-python>=9.0",
+]
+dev = [
+  "build>=1.2",
+  "pytest>=8.2",
+  "pytest-cov>=5.0",
+  "ruff>=0.6",
+]
+
+[project.urls]
+Repository = "https://github.com/mhdihso/procora"
+Documentation = "https://github.com/mhdihso/procora#readme"
+
+[tool.hatch.build.targets.wheel]
+packages = ["procora"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
