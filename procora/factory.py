@@ -36,6 +36,8 @@ def connect(
     autocommit: bool = True,
     connect_timeout: int = 30,
     query_timeout: int = 0,
+    metadata_cache_ttl: float | None = None,
+    metadata_cache_max_size: int | None = 1024,
     **driver_options: Any,
 ) -> Database:
     """Create a lazy, reusable procedure client."""
@@ -70,4 +72,6 @@ def connect(
         query_timeout=query_timeout,
         connection_releaser=connection_releaser,
         on_cleanup_error=on_cleanup_error,
+        metadata_cache_ttl=metadata_cache_ttl,
+        metadata_cache_max_size=metadata_cache_max_size,
     )

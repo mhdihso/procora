@@ -99,6 +99,40 @@ def test_metadata_cache_can_be_invalidated_or_cleared():
     assert len(backend.discoveries) == 3
 
 
+def test_metadata_cache_ttl_can_force_rediscovery():
+    backend = RecordingBackend()
+    database = Database(
+        backend,
+        ConnectionQueue(FakeConnection(), FakeConnection()),
+        metadata_cache_ttl=0,
+    )
+    database.call("Work", Input=1)
+    database.call("Work", Input=2)
+    assert len(backend.discoveries) == 2
+
+
+def test_metadata_cache_has_an_lru_size_limit():
+    backend = RecordingBackend()
+    database = Database(
+        backend,
+        ConnectionQueue(FakeConnection(), FakeConnection(), FakeConnection()),
+        metadata_cache_max_size=1,
+    )
+    database.call("First", Input=1)
+    database.call("Second", Input=2)
+    database.call("First", Input=3)
+    assert [name for name, _ in backend.discoveries] == ["First", "Second", "First"]
+
+
+@pytest.mark.parametrize(
+    ("option", "value"),
+    [("metadata_cache_ttl", -1), ("metadata_cache_max_size", -1)],
+)
+def test_metadata_cache_options_reject_negative_values(option, value):
+    with pytest.raises(ValueError, match=option):
+        Database(RecordingBackend(), lambda: FakeConnection(), **{option: value})
+
+
 def test_mapping_parameters_are_case_friendly_and_reject_duplicates():
     backend = RecordingBackend()
     database = Database(backend, ConnectionQueue(FakeConnection()))

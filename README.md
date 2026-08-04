@@ -193,6 +193,10 @@ db.invalidate_metadata("sales.create_order")
 removed_count = db.clear_metadata_cache()
 ```
 
+The cache keeps at most 1,024 procedures by default. Dynamic-schema applications can
+set `metadata_cache_ttl=300`, adjust `metadata_cache_max_size`, or use size `0` to
+disable metadata storage.
+
 ## Transactions and timeouts
 
 Autocommit is enabled by default. For explicit per-call commit/rollback:

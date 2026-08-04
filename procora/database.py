@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from collections.abc import Callable, Mapping
 from threading import RLock
+from time import monotonic
 from typing import Any
 from warnings import warn
 
@@ -95,16 +97,26 @@ class Database:
         query_timeout: int = 0,
         connection_releaser: ConnectionReleaser | None = None,
         on_cleanup_error: CleanupErrorHandler | None = None,
+        metadata_cache_ttl: float | None = None,
+        metadata_cache_max_size: int | None = 1024,
     ) -> None:
         if query_timeout < 0:
             raise ValueError("query_timeout cannot be negative")
+        if metadata_cache_ttl is not None and metadata_cache_ttl < 0:
+            raise ValueError("metadata_cache_ttl cannot be negative")
+        if metadata_cache_max_size is not None and metadata_cache_max_size < 0:
+            raise ValueError("metadata_cache_max_size cannot be negative")
         self.backend = backend
         self._connection_factory = connection_factory
         self.autocommit = autocommit
         self.query_timeout = query_timeout
         self._connection_releaser = connection_releaser
         self._on_cleanup_error = on_cleanup_error
-        self._metadata_cache: dict[tuple[str, str], ProcedureInfo] = {}
+        self.metadata_cache_ttl = metadata_cache_ttl
+        self.metadata_cache_max_size = metadata_cache_max_size
+        self._metadata_cache: OrderedDict[tuple[str, str], tuple[float, ProcedureInfo]] = (
+            OrderedDict()
+        )
         self._cache_lock = RLock()
         self.procedures = _ProcedureNamespace(self)
         self.schemas = _SchemaNamespace(self)
@@ -193,7 +205,18 @@ class Database:
         if refresh:
             return None
         with self._cache_lock:
-            return self._metadata_cache.get(cache_key)
+            cached = self._metadata_cache.get(cache_key)
+            if cached is None:
+                return None
+            stored_at, info = cached
+            if (
+                self.metadata_cache_ttl is not None
+                and monotonic() - stored_at >= self.metadata_cache_ttl
+            ):
+                del self._metadata_cache[cache_key]
+                return None
+            self._metadata_cache.move_to_end(cache_key)
+            return info
 
     def _discover_and_cache(
         self,
@@ -212,7 +235,13 @@ class Database:
                 f"Could not inspect {label} using {self.backend.name}: {exc}"
             ) from exc
         with self._cache_lock:
-            self._metadata_cache[cache_key] = info
+            if self.metadata_cache_max_size == 0:
+                return info
+            self._metadata_cache[cache_key] = (monotonic(), info)
+            self._metadata_cache.move_to_end(cache_key)
+            if self.metadata_cache_max_size is not None:
+                while len(self._metadata_cache) > self.metadata_cache_max_size:
+                    self._metadata_cache.popitem(last=False)
         return info
 
     def inspect(

@@ -12,6 +12,8 @@ connect(
     autocommit=True,
     connect_timeout=30,
     query_timeout=0,
+    metadata_cache_ttl=None,
+    metadata_cache_max_size=1024,
     **driver_options,
 ) -> Database
 ```
@@ -19,6 +21,10 @@ connect(
 `backend` is `sqlserver`, `postgresql`, `mysql`, an accepted alias, or a custom
 `Backend` instance. Driver options are passed to the selected driver's connection
 constructor. A custom factory cannot be combined with driver options.
+
+Metadata is cached with an LRU limit of 1,024 procedures by default. Set
+`metadata_cache_ttl` in seconds for automatic refresh, `metadata_cache_max_size=None`
+for no size limit, or `metadata_cache_max_size=0` to disable storage.
 
 ## `Database`
 
