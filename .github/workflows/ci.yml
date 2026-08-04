@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e '.[all,dev]'
+      - run: ruff check procora tests examples
+      - run: mypy procora
+      - run: pytest -m 'not integration' --cov=procora --cov-report=term --cov-fail-under=80
+      - run: python -m build
+      - run: python -m pip install --force-reinstall --no-deps dist/*.whl
+      - run: python -c "import procora; print(procora.__version__)"
+
+  python-versions:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: python -m pip install -e '.[dev]'
+      - run: pytest -m 'not integration'
+
+  optional-extras:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        extra: [sqlserver, postgresql, mysql, all]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install ".[${{ matrix.extra }}]"
+      - run: python -c "import procora; from procora import connect; assert callable(connect)"
+
+  postgresql-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: procora_test
+          POSTGRES_DB: procora_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d procora_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PROCORA_INTEGRATION_POSTGRESQL_OPTIONS: '{"dsn":"postgresql://postgres:procora_test@127.0.0.1:5432/procora_test"}'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -e '.[postgresql,dev]'
+      - run: pytest tests/test_integration_procedures.py::test_postgresql_procedure_end_to_end
+
+  mysql-integration:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: procora_test
+          MYSQL_DATABASE: procora_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -pprocora_test --silent"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      PROCORA_INTEGRATION_MYSQL_OPTIONS: '{"host":"127.0.0.1","port":3306,"database":"procora_test","user":"root","password":"procora_test"}'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -e '.[mysql,dev]'
+      - run: pytest tests/test_integration_procedures.py::test_mysql_procedure_end_to_end
+
+  sqlserver-integration:
+    runs-on: ubuntu-latest
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: Procora_Test_42!
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Procora_Test_42!' -C -Q 'SELECT 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      PROCORA_INTEGRATION_SQLSERVER_OPTIONS: '{"host":"127.0.0.1","port":1433,"database":"master","username":"sa","password":"Procora_Test_42!","driver":"ODBC Driver 18 for SQL Server","trust_server_certificate":true}'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install Microsoft ODBC Driver 18
+        run: |
+          curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc >/dev/null
+          curl -sSL https://packages.microsoft.com/config/ubuntu/24.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list >/dev/null
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18
+      - run: python -m pip install -e '.[sqlserver,dev]'
+      - run: pytest tests/test_integration_procedures.py::test_sqlserver_procedure_end_to_end
