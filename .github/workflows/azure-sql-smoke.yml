@@ -1,0 +1,47 @@
+name: Azure SQL Smoke
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  azure-sql-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check Azure SQL configuration
+        id: configuration
+        env:
+          AZURE_SQL_OPTIONS: ${{ secrets.PROCORA_AZURE_SQL_OPTIONS }}
+        run: |
+          if [ -n "$AZURE_SQL_OPTIONS" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Set the PROCORA_AZURE_SQL_OPTIONS repository secret to run this smoke test."
+          fi
+      - if: steps.configuration.outputs.configured == 'true'
+        uses: actions/checkout@v7
+      - if: steps.configuration.outputs.configured == 'true'
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - if: steps.configuration.outputs.configured == 'true'
+        name: Install Microsoft ODBC Driver 18
+        run: |
+          curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc >/dev/null
+          curl -sSL https://packages.microsoft.com/config/ubuntu/24.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list >/dev/null
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18
+      - if: steps.configuration.outputs.configured == 'true'
+        run: python -m pip install -e '.[sqlserver,dev]'
+      - if: steps.configuration.outputs.configured == 'true'
+        name: Ping Azure SQL through Procora
+        env:
+          PROCORA_SQLSERVER_OPTIONS: ${{ secrets.PROCORA_AZURE_SQL_OPTIONS }}
+        run: pytest tests/test_live_databases.py -k sqlserver

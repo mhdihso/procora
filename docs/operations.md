@@ -92,3 +92,17 @@ tests both the exact minimum supported driver set and the newest versions allowe
 package constraints. Its integration matrix covers PostgreSQL 11, 14, and 17; MySQL 8.0
 and 8.4; and SQL Server 2019 and 2022 with ODBC Driver 18. Other server/driver
 combinations should be validated before use in critical deployments.
+
+## Azure SQL smoke test
+
+The `Azure SQL Smoke` workflow runs every Monday and can also be started manually. Add
+an encrypted repository secret named `PROCORA_AZURE_SQL_OPTIONS` containing the same JSON
+accepted by `connect("sqlserver", ...)`, for example:
+
+```json
+{"host":"example.database.windows.net","database":"app","username":"user","password":"secret","driver":"ODBC Driver 18 for SQL Server"}
+```
+
+The workflow installs ODBC Driver 18 and calls `Database.ping()` through the SQL Server
+backend. When the secret is absent, it reports a notice and skips external setup instead
+of failing pull requests or scheduled builds.
