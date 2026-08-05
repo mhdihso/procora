@@ -97,7 +97,7 @@ def test_mysql_timeout_is_applied_when_the_connection_is_created(monkeypatch):
 def test_mysql_schema_resolution_requires_a_selected_database():
     connection = FakeConnection(FakeCursor([(["database"], [(None,)])]))
     with pytest.raises(ProcedureParameterError, match="selected database"):
-        MySQLBackend().resolve_schema(connection, None)
+        MySQLBackend().resolve_schema(connection, "work", None)
 
 
 @pytest.mark.parametrize(

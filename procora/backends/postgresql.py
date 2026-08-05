@@ -117,7 +117,8 @@ class PostgreSQLBackend(Backend):
                 (str(state),),
             )
 
-    def resolve_schema(self, connection: Any, schema: str | None) -> str:
+    def resolve_schema(self, connection: Any, name: str, schema: str | None) -> str:
+        _ = name
         if schema is not None:
             return schema
         with managed_cursor(connection.cursor()) as cursor:
@@ -130,7 +131,7 @@ class PostgreSQLBackend(Backend):
         return str(row[0])
 
     def discover(self, connection: Any, name: str, schema: str | None) -> ProcedureInfo:
-        schema = self.resolve_schema(connection, schema)
+        schema = self.resolve_schema(connection, name, schema)
         with managed_cursor(connection.cursor()) as cursor:
             cursor.execute(_METADATA_SQL, (schema, name))
             rows = cursor.fetchall()

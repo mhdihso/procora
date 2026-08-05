@@ -329,7 +329,7 @@ class Database:
 
     def _resolve_schema(self, connection: Any, schema: str | None, name: str) -> str | None:
         try:
-            return self.backend.resolve_schema(connection, schema)
+            return self.backend.resolve_schema(connection, name, schema)
         except ProcoraError:
             raise
         except Exception as exc:

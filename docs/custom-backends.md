@@ -40,9 +40,10 @@ class ExampleBackend(Backend):
 
         return factory
 
-    def resolve_schema(self, connection, schema):
+    def resolve_schema(self, connection, name, schema):
         if schema is not None:
             return schema
+        # Use both `name` and connection state when the database has lookup rules.
         return connection.current_schema
 
     def discover(self, connection, name, schema):

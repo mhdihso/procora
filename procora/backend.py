@@ -104,14 +104,19 @@ class Backend(ABC):
             row = cursor.fetchone()
             return bool(row and row[0] == 1)
 
-    def resolve_schema(self, connection: Any, schema: str | None) -> str | None:
+    def resolve_schema(
+        self,
+        connection: Any,
+        name: str,
+        schema: str | None,
+    ) -> str | None:
         """Resolve an unqualified call to a stable metadata-cache namespace.
 
         Backends whose default schema depends on connection state should override this
         method. Returning ``None`` retains a shared unqualified namespace, which is
         appropriate only when the backend's default is stable across all connections.
         """
-        _ = connection
+        _ = (connection, name)
         return schema
 
     def set_query_timeout(self, connection: Any, seconds: int) -> None:

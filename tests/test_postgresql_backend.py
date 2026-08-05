@@ -236,4 +236,4 @@ def test_postgresql_connection_factory_forwards_supported_driver_options(
 def test_postgresql_schema_resolution_rejects_an_empty_search_path():
     connection = FakeConnection(FakeCursor([(["current_schema"], [(None,)])]))
     with pytest.raises(ProcedureParameterError, match="current schema"):
-        PostgreSQLBackend().resolve_schema(connection, None)
+        PostgreSQLBackend().resolve_schema(connection, "work", None)

@@ -135,7 +135,8 @@ def test_unqualified_metadata_cache_is_partitioned_by_resolved_schema():
             self.current_schema = current_schema
 
     class SchemaAwareBackend(RecordingBackend):
-        def resolve_schema(self, connection, schema):
+        def resolve_schema(self, connection, name, schema):
+            _ = name
             return schema or connection.current_schema
 
     backend = SchemaAwareBackend()
@@ -162,7 +163,8 @@ def test_unqualified_invalidation_removes_every_resolved_schema_entry():
             self.current_schema = current_schema
 
     class SchemaAwareBackend(RecordingBackend):
-        def resolve_schema(self, connection, schema):
+        def resolve_schema(self, connection, name, schema):
+            _ = name
             return schema or connection.current_schema
 
     backend = SchemaAwareBackend()
