@@ -32,9 +32,10 @@ The database principal needs enough metadata visibility to discover the procedur
 
 Discovery uses `pg_catalog.pg_proc` and `pg_catalog.pg_namespace`, selecting only stored procedures (`prokind = 'p'`). PostgreSQL functions are deliberately outside Procora's stored-procedure API.
 
-When no schema is supplied, discovery intentionally uses only `current_schema()` rather
-than searching every entry in `search_path`. Pass an explicit schema when procedures
-live outside the current schema.
+When no schema is supplied, Procora resolves the requested procedure using PostgreSQL's
+effective `search_path` visibility. No visible procedure raises `ProcedureNotFoundError`;
+multiple visible procedures or overloads raise `AmbiguousProcedureError`. Pass an
+explicit schema to select a particular namespace.
 
 Calls use named notation whenever parameters have names. This allows defaulted input parameters to be omitted while required OUT placeholders are still supplied as `NULL`. PostgreSQL returns OUT/INOUT values as one row; Procora converts that row into `result.output`.
 

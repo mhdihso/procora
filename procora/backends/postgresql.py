@@ -50,6 +50,17 @@ WHERE procedure_object.prokind = 'p'
 ORDER BY procedure_schema.nspname, procedure_object.proname;
 """
 
+_VISIBLE_PROCEDURE_SQL = """
+SELECT procedure_schema.nspname, procedure_object.oid
+FROM pg_catalog.pg_proc AS procedure_object
+JOIN pg_catalog.pg_namespace AS procedure_schema
+    ON procedure_schema.oid = procedure_object.pronamespace
+WHERE procedure_object.prokind = 'p'
+  AND procedure_object.proname = %s
+  AND pg_catalog.pg_function_is_visible(procedure_object.oid)
+ORDER BY procedure_object.oid;
+"""
+
 
 def _quote(value: str) -> str:
     return '"' + value.replace('"', '""') + '"'
@@ -118,17 +129,21 @@ class PostgreSQLBackend(Backend):
             )
 
     def resolve_schema(self, connection: Any, name: str, schema: str | None) -> str:
-        _ = name
         if schema is not None:
             return schema
         with managed_cursor(connection.cursor()) as cursor:
-            cursor.execute("SELECT current_schema()")
-            row = cursor.fetchone()
-        if not row or not row[0]:
-            raise ProcedureParameterError(
-                "PostgreSQL needs a current schema or an explicit schema"
+            cursor.execute(_VISIBLE_PROCEDURE_SQL, (name,))
+            rows = cursor.fetchall()
+        if not rows:
+            raise ProcedureNotFoundError(
+                f"PostgreSQL procedure is not visible on search_path: {name}"
             )
-        return str(row[0])
+        if len(rows) > 1:
+            raise AmbiguousProcedureError(
+                f"Multiple PostgreSQL procedures are visible on search_path: {name}; "
+                "pass an explicit schema"
+            )
+        return str(rows[0][0])
 
     def discover(self, connection: Any, name: str, schema: str | None) -> ProcedureInfo:
         schema = self.resolve_schema(connection, name, schema)

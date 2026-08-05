@@ -62,8 +62,9 @@ native missing-parameter error.
 
 ## Schema-aware metadata caching
 
-Before caching an unqualified procedure, PostgreSQL resolves `current_schema()`, MySQL
-resolves `DATABASE()`, and SQL Server resolves `dbo`. The resolved value is part of the
+Before caching an unqualified procedure, PostgreSQL resolves effective `search_path`
+visibility for that procedure name, MySQL resolves `DATABASE()`, and SQL Server resolves
+its applicable schema. The resolved value is part of the
 cache key, so connections with different session defaults cannot share metadata. An
 unqualified `invalidate_metadata()` call removes matching entries across every resolved
 schema; a qualified call removes only its exact entry.
@@ -79,8 +80,8 @@ convenience syntax and may require `getattr()` for Python keywords or unusual na
 
 MySQL Connector/Python does not expose an identifier-quoting hook for `callproc()`, so
 the built-in MySQL adapter accepts conventional unquoted identifiers only. PostgreSQL
-uses `current_schema()` for an unqualified name; pass a schema when search-path behavior
-would be ambiguous.
+uses effective `search_path` visibility for an unqualified name and rejects ambiguous
+visible procedures; pass an explicit schema to choose one.
 
 ## Tested compatibility
 

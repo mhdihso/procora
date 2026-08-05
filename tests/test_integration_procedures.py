@@ -24,7 +24,9 @@ def test_postgresql_procedure_end_to_end():
     connection = psycopg.connect(dsn, autocommit=True, **direct_options)
     try:
         connection.execute("DROP SCHEMA IF EXISTS procora_it CASCADE")
+        connection.execute("DROP SCHEMA IF EXISTS procora_empty CASCADE")
         connection.execute("CREATE SCHEMA procora_it")
+        connection.execute("CREATE SCHEMA procora_empty")
         connection.execute(
             """
             CREATE PROCEDURE procora_it.calculate(
@@ -112,7 +114,7 @@ def test_postgresql_procedure_end_to_end():
         assert len(database.inspect("procora_it.changing", refresh=True).parameters) == 2
 
         pooled_connection = psycopg.connect(dsn, autocommit=False, **direct_options)
-        pooled_connection.execute("SET search_path TO procora_it")
+        pooled_connection.execute("SET search_path TO procora_empty, procora_it")
         pooled_connection.commit()
         available = [pooled_connection]
 
@@ -137,6 +139,7 @@ def test_postgresql_procedure_end_to_end():
         pooled_connection.close()
     finally:
         connection.execute("DROP SCHEMA IF EXISTS procora_it CASCADE")
+        connection.execute("DROP SCHEMA IF EXISTS procora_empty CASCADE")
         connection.close()
 
 

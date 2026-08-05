@@ -2,6 +2,7 @@ import pytest
 
 from procora import (
     AmbiguousProcedureError,
+    ProcedureNotFoundError,
     ProcedureParameterError,
     UnsupportedParameterError,
 )
@@ -233,7 +234,27 @@ def test_postgresql_connection_factory_forwards_supported_driver_options(
     assert captured["kwargs"]["connect_timeout"] == 8
 
 
-def test_postgresql_schema_resolution_rejects_an_empty_search_path():
-    connection = FakeConnection(FakeCursor([(["current_schema"], [(None,)])]))
-    with pytest.raises(ProcedureParameterError, match="current schema"):
-        PostgreSQLBackend().resolve_schema(connection, "work", None)
+def test_postgresql_schema_resolution_uses_visible_procedure_name():
+    cursor = FakeCursor([(["schema", "oid"], [("effective_schema", 42)])])
+    assert (
+        PostgreSQLBackend().resolve_schema(FakeConnection(cursor), "work", None)
+        == "effective_schema"
+    )
+    assert cursor.executions[0][1] == (("work",),)
+
+
+def test_postgresql_schema_resolution_rejects_missing_and_ambiguous_names():
+    with pytest.raises(ProcedureNotFoundError, match="not visible"):
+        PostgreSQLBackend().resolve_schema(
+            FakeConnection(FakeCursor([(["schema", "oid"], [])])),
+            "missing",
+            None,
+        )
+
+    rows = [("first", 1), ("second", 2)]
+    with pytest.raises(AmbiguousProcedureError, match="pass an explicit schema"):
+        PostgreSQLBackend().resolve_schema(
+            FakeConnection(FakeCursor([(["schema", "oid"], rows)])),
+            "work",
+            None,
+        )
