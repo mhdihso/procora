@@ -53,6 +53,25 @@ WHERE procedure_object.is_ms_shipped = 0
 ORDER BY procedure_schema.name, procedure_object.name;
 """
 
+_RESOLVE_SCHEMA_SQL = """
+WITH candidate_schema AS (
+    SELECT SCHEMA_NAME() AS schema_name, 0 AS precedence
+    UNION ALL
+    SELECT N'dbo', 1
+)
+SELECT TOP (1) candidate_schema.schema_name
+FROM candidate_schema
+WHERE EXISTS (
+    SELECT 1
+    FROM sys.procedures AS procedure_object
+    JOIN sys.schemas AS procedure_schema
+        ON procedure_schema.schema_id = procedure_object.schema_id
+    WHERE procedure_schema.name = candidate_schema.schema_name
+      AND procedure_object.name = ?
+)
+ORDER BY candidate_schema.precedence;
+"""
+
 _RETURN_COLUMN = "__procora_return_value"
 _OUTPUT_PREFIX = "__procora_output_"
 
@@ -225,8 +244,16 @@ class SQLServerBackend(Backend):
             connection.timeout = int(state)
 
     def resolve_schema(self, connection: Any, name: str, schema: str | None) -> str:
-        _ = (connection, name)
-        return schema or "dbo"
+        if schema is not None:
+            return schema
+        with managed_cursor(connection.cursor()) as cursor:
+            cursor.execute(_RESOLVE_SCHEMA_SQL, name)
+            row = cursor.fetchone()
+        if not row:
+            raise ProcedureNotFoundError(
+                f"SQL Server procedure does not exist in the default schema or dbo: {name}"
+            )
+        return str(row[0])
 
     def discover(self, connection: Any, name: str, schema: str | None) -> ProcedureInfo:
         schema = self.resolve_schema(connection, name, schema)

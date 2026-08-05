@@ -4,6 +4,7 @@ from procora import (
     ConfigurationError,
     ProcedureExecutionError,
     ProcedureInfo,
+    ProcedureNotFoundError,
     ProcedureParameter,
     UnsupportedParameterError,
 )
@@ -100,6 +101,22 @@ def test_sqlserver_query_timeout_is_restored():
     assert connection.timeout == 5
     backend.reset_connection(connection, state)
     assert connection.timeout == 30
+
+
+@pytest.mark.parametrize("resolved_schema", ["sales", "dbo"])
+def test_sqlserver_resolves_default_schema_then_dbo(resolved_schema):
+    cursor = FakeCursor([(["schema"], [(resolved_schema,)])])
+    schema = SQLServerBackend().resolve_schema(FakeConnection(cursor), "Calculate", None)
+    assert schema == resolved_schema
+    assert "SCHEMA_NAME()" in cursor.executions[0][0]
+    assert "N'dbo'" in cursor.executions[0][0]
+    assert cursor.executions[0][1] == ("Calculate",)
+
+
+def test_sqlserver_unqualified_missing_procedure_is_explicit():
+    cursor = FakeCursor([(["schema"], [])])
+    with pytest.raises(ProcedureNotFoundError, match="default schema or dbo"):
+        SQLServerBackend().resolve_schema(FakeConnection(cursor), "Missing", None)
 
 
 @pytest.mark.parametrize(

@@ -26,6 +26,11 @@ support table-valued parameters; use an application-specific custom backend for 
 Driver-level query timeouts are restored to their previous value before a pooled
 connection is released. Procora does not change the session's `NOCOUNT` setting.
 
+For an unqualified procedure name, Procora follows SQL Server object resolution: it
+checks the connected principal's effective default schema first and then `dbo`. If the
+procedure exists in neither schema, it raises `ProcedureNotFoundError`. An explicit
+schema bypasses this lookup.
+
 The database principal needs enough metadata visibility to discover the procedure and `EXECUTE` permission to call it.
 
 ## PostgreSQL

@@ -235,7 +235,46 @@ def test_sqlserver_procedure_end_to_end():
 
     connection = pyodbc.connect(_connection_string(options), autocommit=True)
     cursor = connection.cursor()
+    resolution_connection = None
     try:
+        cursor.execute(
+            """
+            DROP PROCEDURE IF EXISTS dbo.procora_it_resolution;
+            DROP PROCEDURE IF EXISTS dbo.procora_it_dbo_fallback;
+            DROP PROCEDURE IF EXISTS procora_it_user_schema.procora_it_resolution;
+            IF SCHEMA_ID(N'procora_it_user_schema') IS NOT NULL
+                EXEC(N'DROP SCHEMA procora_it_user_schema');
+            IF USER_ID(N'procora_it_user') IS NOT NULL
+                DROP USER procora_it_user;
+            """
+        )
+        cursor.execute("CREATE SCHEMA procora_it_user_schema AUTHORIZATION dbo")
+        cursor.execute(
+            """
+            CREATE USER procora_it_user WITHOUT LOGIN
+            WITH DEFAULT_SCHEMA = procora_it_user_schema
+            """
+        )
+        cursor.execute(
+            """
+            CREATE PROCEDURE procora_it_user_schema.procora_it_resolution
+            AS SELECT N'default' AS resolved_schema
+            """
+        )
+        cursor.execute(
+            """
+            CREATE PROCEDURE dbo.procora_it_resolution
+            AS SELECT N'dbo' AS resolved_schema
+            """
+        )
+        cursor.execute(
+            """
+            CREATE PROCEDURE dbo.procora_it_dbo_fallback
+            AS SELECT N'dbo' AS resolved_schema
+            """
+        )
+        cursor.execute("GRANT EXECUTE TO procora_it_user")
+        cursor.execute("GRANT VIEW DEFINITION TO procora_it_user")
         cursor.execute(
             """
             CREATE OR ALTER PROCEDURE dbo.procora_it_calculate
@@ -298,6 +337,25 @@ def test_sqlserver_procedure_end_to_end():
         assert native["datetime_value"].isoformat() == "2026-08-04T12:34:56"
         assert native["json_value"] == '{"ok":true}'
 
+        resolution_connection = pyodbc.connect(
+            _connection_string(options),
+            autocommit=True,
+        )
+        resolution_cursor = resolution_connection.cursor()
+        resolution_cursor.execute("EXECUTE AS USER = 'procora_it_user'")
+        resolution_available = [resolution_connection]
+        resolution_database = connect(
+            "sqlserver",
+            connection_factory=lambda: resolution_available.pop(),
+            connection_releaser=resolution_available.append,
+        )
+        assert resolution_database.call("procora_it_resolution").scalar == "default"
+        assert resolution_database.call("procora_it_dbo_fallback").scalar == "dbo"
+        resolution_cursor.execute("REVERT")
+        resolution_cursor.close()
+        resolution_connection.close()
+        resolution_connection = None
+
         pooled_connection = pyodbc.connect(_connection_string(options), autocommit=False)
         pooled_connection.timeout = 17
         available = [pooled_connection]
@@ -325,9 +383,22 @@ def test_sqlserver_procedure_end_to_end():
         assert pooled_connection.timeout == 17
         pooled_connection.close()
     finally:
+        if resolution_connection is not None:
+            resolution_connection.close()
         cursor.execute("DROP PROCEDURE IF EXISTS dbo.procora_it_calculate")
         cursor.execute("DROP PROCEDURE IF EXISTS dbo.procora_it_defaults")
         cursor.execute("DROP PROCEDURE IF EXISTS dbo.procora_it_zero_arguments")
         cursor.execute("DROP PROCEDURE IF EXISTS dbo.procora_it_always_fails")
+        cursor.execute("DROP PROCEDURE IF EXISTS dbo.procora_it_resolution")
+        cursor.execute("DROP PROCEDURE IF EXISTS dbo.procora_it_dbo_fallback")
+        cursor.execute(
+            """
+            DROP PROCEDURE IF EXISTS procora_it_user_schema.procora_it_resolution;
+            IF SCHEMA_ID(N'procora_it_user_schema') IS NOT NULL
+                EXEC(N'DROP SCHEMA procora_it_user_schema');
+            IF USER_ID(N'procora_it_user') IS NOT NULL
+                DROP USER procora_it_user;
+            """
+        )
         cursor.close()
         connection.close()
