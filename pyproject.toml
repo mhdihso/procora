@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "procora"
-version = "0.9.0"
+version = "1.0.0"
 description = "Call stored procedures across SQL Server, PostgreSQL, and MySQL."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,7 +13,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "Mehdi Hoseyni" }]
 keywords = ["stored-procedure", "database", "sql-server", "postgresql", "mysql"]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
