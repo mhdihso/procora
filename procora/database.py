@@ -442,6 +442,9 @@ class Database:
                 commit_in_progress = False
             return result
         except ProcoraError:
+            if commit_in_progress:
+                # A commit error is uncertain regardless of the exception hierarchy.
+                connection_healthy = False
             if not self._rollback(connection):
                 connection_healthy = False
             raise

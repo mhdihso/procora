@@ -642,6 +642,30 @@ def test_uncertain_commit_failure_discards_connection_even_after_rollback():
     assert discarded == [connection]
 
 
+def test_procora_commit_failure_also_discards_connection_after_rollback():
+    class ProcoraCommitFailureConnection(FakeConnection):
+        def commit(self):
+            self.commits += 1
+            raise ProcedureExecutionError("procora commit outcome unknown")
+
+    connection = ProcoraCommitFailureConnection(autocommit=False)
+    released = []
+    discarded = []
+    database = Database(
+        RecordingBackend(),
+        lambda: connection,
+        autocommit=False,
+        connection_releaser=released.append,
+        connection_discarder=discarded.append,
+    )
+
+    with pytest.raises(ProcedureExecutionError, match="procora commit outcome unknown"):
+        database.call("Work", Input=1)
+    assert connection.rollbacks == 1
+    assert released == []
+    assert discarded == [connection]
+
+
 def test_result_json_helper():
     procedure = ProcedureInfo("test", "public", "json_proc")
     result = ProcedureResult(
