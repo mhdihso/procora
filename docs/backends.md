@@ -56,6 +56,10 @@ The database principal needs enough metadata visibility to discover the procedur
 
 Discovery uses `pg_catalog.pg_proc` and `pg_catalog.pg_namespace`, selecting only stored procedures (`prokind = 'p'`). PostgreSQL functions are deliberately outside Procora's stored-procedure API.
 
+PostgreSQL 11–13 procedures support `INOUT` output values. Pure procedure `OUT`
+parameters are supported by PostgreSQL 14 and newer; this is a server-version capability,
+not a Procora restriction.
+
 When no schema is supplied, Procora resolves the requested procedure using PostgreSQL's
 effective `search_path` visibility. No visible procedure raises `ProcedureNotFoundError`;
 multiple visible procedures or overloads raise `AmbiguousProcedureError`. Pass an

@@ -22,7 +22,7 @@ There are no duplicated procedure definitions, SQL templates, Django project, or
 | Backend | Driver | Result sets | OUT/INOUT | Integer return code |
 |---|---|---:|---:|---:|
 | SQL Server / Azure SQL | `pyodbc` | yes | yes | yes |
-| PostgreSQL 11+ | `psycopg` 3 | procedure output row | yes | not applicable |
+| PostgreSQL 11+ | `psycopg` 3 | procedure output row | INOUT on 11+; OUT on 14+ | not applicable |
 | MySQL | MySQL Connector/Python | yes | yes | not applicable |
 
 MariaDB can use the MySQL adapter when its Connector/Python-compatible behavior matches the called routines. Additional databases can implement Procora's small `Backend` interface.

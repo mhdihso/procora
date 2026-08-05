@@ -27,22 +27,43 @@ def test_postgresql_procedure_end_to_end():
         connection.execute("DROP SCHEMA IF EXISTS procora_empty CASCADE")
         connection.execute("CREATE SCHEMA procora_it")
         connection.execute("CREATE SCHEMA procora_empty")
-        connection.execute(
-            """
-            CREATE PROCEDURE procora_it.calculate(
-                IN value integer,
-                INOUT doubled integer,
-                OUT label text
+        server_version = int(connection.execute("SHOW server_version_num").fetchone()[0])
+        if server_version >= 140000:
+            connection.execute(
+                """
+                CREATE PROCEDURE procora_it.calculate(
+                    IN value integer,
+                    INOUT doubled integer,
+                    OUT label text
+                )
+                LANGUAGE plpgsql
+                AS $$
+                BEGIN
+                    doubled := value * 2;
+                    label := 'ok';
+                END;
+                $$
+                """
             )
-            LANGUAGE plpgsql
-            AS $$
-            BEGIN
-                doubled := value * 2;
-                label := 'ok';
-            END;
-            $$
-            """
-        )
+            calculate_inputs = {"value": 7, "doubled": 0}
+        else:
+            connection.execute(
+                """
+                CREATE PROCEDURE procora_it.calculate(
+                    IN value integer,
+                    INOUT doubled integer,
+                    INOUT label text
+                )
+                LANGUAGE plpgsql
+                AS $$
+                BEGIN
+                    doubled := value * 2;
+                    label := 'ok';
+                END;
+                $$
+                """
+            )
+            calculate_inputs = {"value": 7, "doubled": 0, "label": ""}
         connection.execute(
             """
             CREATE PROCEDURE procora_it.with_defaults(
@@ -95,7 +116,7 @@ def test_postgresql_procedure_end_to_end():
             "doubled",
             "label",
         ]
-        result = database.call("procora_it.calculate", value=7, doubled=0)
+        result = database.call("procora_it.calculate", calculate_inputs)
         assert result.output == {"doubled": 14, "label": "ok"}
         assert database.call("procora_it.with_defaults").output == {"doubled": 18}
         assert database.call("procora_it.zero_arguments").rows == []
