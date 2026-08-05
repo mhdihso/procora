@@ -264,6 +264,9 @@ See [custom backends](docs/custom-backends.md) for a complete minimal implementa
 ## Database-specific behavior
 
 - SQL Server T-SQL procedure defaults are left to SQL Server because their expressions are not reliably present in `sys.parameters`.
+- A defaulted SQL Server `OUTPUT` parameter must receive its desired initial value
+  explicitly. Procora passes a local variable to capture the output, so omitting that
+  input passes `NULL` rather than activating the T-SQL default.
 - PostgreSQL overloaded procedure names are ambiguous without a signature; Procora asks for a uniquely named wrapper rather than guessing a type overload.
 - PostgreSQL functions are not procedures and should be queried with `SELECT`, so the PostgreSQL adapter intentionally discovers only `prokind = 'p'`.
 - MySQL requires every IN/INOUT argument. OUT placeholders are provided automatically.

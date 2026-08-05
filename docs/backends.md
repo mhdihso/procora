@@ -16,7 +16,21 @@ All built-in backends:
 
 Discovery uses `sys.procedures`, `sys.schemas`, `sys.parameters`, and `sys.types`. Input values use ODBC parameter markers. Output parameters and the integer return code use local T-SQL variables selected in a final private marker result set.
 
-SQL Server reports `OUTPUT` parameters as capable of receiving an initial input. Supply one normally if the procedure uses INOUT behavior; otherwise Procora initializes the output variable to `NULL`.
+SQL Server reports `OUTPUT` parameters as capable of receiving an initial input. Supply
+one normally if the procedure uses INOUT behavior; otherwise Procora initializes the
+output variable to `NULL`.
+
+This also applies when an `OUTPUT` parameter has a default in its T-SQL declaration.
+Procora must pass a local variable to capture the output, and SQL Server does not apply
+the declared default to that explicitly passed `NULL`. Procora cannot reliably discover
+the default from `sys.parameters` and does not parse module definitions. Supply the
+desired initial value explicitly:
+
+```python
+# CREATE PROCEDURE dbo.increment @value int = 5 OUTPUT ...
+result = db.call("dbo.increment", value=5)
+assert result.output["value"] == 6
+```
 
 Character lengths, binary lengths, `max`, decimal precision/scale, temporal scale, and user-defined alias types are reconstructed from catalog metadata for output variables.
 

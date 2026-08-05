@@ -320,6 +320,16 @@ def test_sqlserver_procedure_end_to_end():
             END
             """
         )
+        cursor.execute(
+            """
+            CREATE OR ALTER PROCEDURE dbo.procora_it_defaulted_output
+                @value int = 5 OUTPUT
+            AS
+            BEGIN
+                SET @value = @value + 1;
+            END
+            """
+        )
 
         database = connect("sqlserver", **options)
         result = database.call("dbo.procora_it_calculate", value=7, doubled=0)
@@ -330,6 +340,10 @@ def test_sqlserver_procedure_end_to_end():
         assert result.output == {"doubled": 14}
         assert result.return_value == 7
         assert database.call("dbo.procora_it_defaults").scalar == 9
+        assert database.call("dbo.procora_it_defaulted_output").output == {"value": None}
+        assert database.call("dbo.procora_it_defaulted_output", value=5).output == {
+            "value": 6
+        }
         native = database.call("dbo.procora_it_zero_arguments").first
         assert native is not None
         assert str(native["decimal_value"]) == "12.34"
@@ -389,6 +403,7 @@ def test_sqlserver_procedure_end_to_end():
         cursor.execute("DROP PROCEDURE IF EXISTS dbo.procora_it_defaults")
         cursor.execute("DROP PROCEDURE IF EXISTS dbo.procora_it_zero_arguments")
         cursor.execute("DROP PROCEDURE IF EXISTS dbo.procora_it_always_fails")
+        cursor.execute("DROP PROCEDURE IF EXISTS dbo.procora_it_defaulted_output")
         cursor.execute("DROP PROCEDURE IF EXISTS dbo.procora_it_resolution")
         cursor.execute("DROP PROCEDURE IF EXISTS dbo.procora_it_dbo_fallback")
         cursor.execute(
