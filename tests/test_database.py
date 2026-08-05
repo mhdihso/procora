@@ -256,6 +256,16 @@ def test_invalidation_during_discovery_prevents_that_entry_from_being_cached():
 
     database.inspect("public.Work")
     assert backend.discoveries == [("Work", "public"), ("Work", "public")]
+    assert database._cache_key_generations == {}
+
+
+def test_invalidating_inactive_unknown_keys_does_not_retain_generations():
+    database = Database(RecordingBackend(), FakeConnection)
+
+    for index in range(10_000):
+        assert database.invalidate_metadata(f"tenant.procedure_{index}") is False
+
+    assert database._cache_key_generations == {}
 
 
 def test_mapping_parameters_are_case_friendly_and_reject_duplicates():

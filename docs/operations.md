@@ -71,7 +71,9 @@ schema; a qualified call removes only its exact entry.
 
 Cache clearing and invalidation also cover discovery already in progress. The active
 caller may receive the metadata it discovered, but Procora will not publish that stale
-entry back into the cache after the invalidation generation changes.
+entry back into the cache after the invalidation generation changes. Per-key generation
+state exists only while discovery is active and is removed on completion, so invalidating
+arbitrary inactive names does not create an unbounded bookkeeping cache.
 
 ## Identifier limitations
 

@@ -210,9 +210,10 @@ class Database:
             if schema_name is not None:
                 cache_key = (schema_name, procedure_name)
                 removed = self._metadata_cache.pop(cache_key, None) is not None
-                self._cache_key_generations[cache_key] = (
-                    self._cache_key_generations.get(cache_key, 0) + 1
-                )
+                if cache_key in self._metadata_inflight:
+                    self._cache_key_generations[cache_key] = (
+                        self._cache_key_generations.get(cache_key, 0) + 1
+                    )
                 return removed
             matching = {
                 key
@@ -222,9 +223,10 @@ class Database:
             removed = any(key in self._metadata_cache for key in matching)
             for key in matching:
                 self._metadata_cache.pop(key, None)
-                self._cache_key_generations[key] = (
-                    self._cache_key_generations.get(key, 0) + 1
-                )
+                if key in self._metadata_inflight:
+                    self._cache_key_generations[key] = (
+                        self._cache_key_generations.get(key, 0) + 1
+                    )
             return removed
 
     def clear_metadata_cache(self) -> int:
@@ -292,6 +294,7 @@ class Database:
         with self._cache_lock:
             if self._metadata_inflight.get(cache_key) is pending:
                 del self._metadata_inflight[cache_key]
+                self._cache_key_generations.pop(cache_key, None)
             pending.set()
 
     def _discover_and_cache(
