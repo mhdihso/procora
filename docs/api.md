@@ -35,6 +35,11 @@ for no size limit, or `metadata_cache_max_size=0` to disable storage.
   procedure metadata.
 - `invalidate_metadata(name, *, schema=None) -> bool`: remove one cached procedure.
 - `clear_metadata_cache() -> int`: clear the cache and return the number of entries.
+
+Metadata cache keys and qualified invalidation preserve identifier casing. Use the same
+canonical schema and procedure spelling throughout an application. Procora does not
+normalize casing because database identifier sensitivity depends on backend and catalog
+collation.
 - `call(name, parameters=None, *, schema=None, refresh=False, **values) -> ProcedureResult`:
   discover and execute a procedure.
 - `procedure(name, *, schema=None) -> Procedure`: create a reusable callable proxy. The

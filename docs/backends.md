@@ -45,6 +45,11 @@ checks the connected principal's effective default schema first and then `dbo`. 
 procedure exists in neither schema, it raises `ProcedureNotFoundError`. An explicit
 schema bypasses this lookup.
 
+SQL Server catalog collation controls identifier case sensitivity. Procora preserves
+identifier spelling in metadata cache keys rather than assuming a collation. Use one
+consistent schema/procedure casing for calls and `invalidate_metadata()` so a
+case-insensitive database does not accumulate duplicate cache entries.
+
 The database principal needs enough metadata visibility to discover the procedure and `EXECUTE` permission to call it.
 
 ## PostgreSQL

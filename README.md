@@ -205,6 +205,12 @@ pass an explicit schema to remove only one entry.
 Invalidation and clearing are generation-safe: metadata discovery that started before
 either operation may finish for its caller, but cannot repopulate the invalidated cache.
 
+Cache identity preserves the schema and procedure spelling returned or supplied to the
+API. Use consistent canonical casing for calls and invalidation. This matters on a
+case-insensitive SQL Server database, where `dbo.GetUsers` and `DBO.getusers` may resolve
+to the same object but intentionally remain distinct cache identities; Procora does not
+case-fold names because that would be incorrect for case-sensitive databases.
+
 ## Transactions and timeouts
 
 Autocommit is enabled by default. For explicit per-call commit/rollback:
