@@ -86,9 +86,13 @@ jobs:
 
   postgresql-integration:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        postgresql-version: [11-alpine, 14-alpine, 17-alpine]
     services:
       postgres:
-        image: postgres:17-alpine
+        image: postgres:${{ matrix.postgresql-version }}
         env:
           POSTGRES_PASSWORD: procora_test
           POSTGRES_DB: procora_test
@@ -112,9 +116,13 @@ jobs:
 
   mysql-integration:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mysql-version: ["8.0", "8.4"]
     services:
       mysql:
-        image: mysql:8.4
+        image: mysql:${{ matrix.mysql-version }}
         env:
           MYSQL_ROOT_PASSWORD: procora_test
           MYSQL_DATABASE: procora_test
@@ -138,16 +146,20 @@ jobs:
 
   sqlserver-integration:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        sqlserver-version: ["2019", "2022"]
     services:
       sqlserver:
-        image: mcr.microsoft.com/mssql/server:2022-latest
+        image: mcr.microsoft.com/mssql/server:${{ matrix.sqlserver-version }}-latest
         env:
           ACCEPT_EULA: Y
           MSSQL_SA_PASSWORD: Procora_Test_42!
         ports:
           - 1433:1433
         options: >-
-          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Procora_Test_42!' -C -Q 'SELECT 1'"
+          --health-cmd "if [ -x /opt/mssql-tools18/bin/sqlcmd ]; then /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Procora_Test_42!' -C -Q 'SELECT 1'; else /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'Procora_Test_42!' -Q 'SELECT 1'; fi"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 30

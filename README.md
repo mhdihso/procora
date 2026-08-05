@@ -27,6 +27,10 @@ There are no duplicated procedure definitions, SQL templates, Django project, or
 
 MariaDB can use the MySQL adapter when its Connector/Python-compatible behavior matches the called routines. Additional databases can implement Procora's small `Backend` interface.
 
+Real-database CI covers PostgreSQL 11, 14, and 17; MySQL 8.0 and 8.4; and SQL Server
+2019 and 2022. Azure SQL uses the SQL Server backend and is validated separately through
+an optional smoke workflow.
+
 SQLite is not listed because SQLite does not implement stored procedures.
 
 ## Installation
