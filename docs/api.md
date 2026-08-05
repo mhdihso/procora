@@ -35,11 +35,6 @@ for no size limit, or `metadata_cache_max_size=0` to disable storage.
   procedure metadata.
 - `invalidate_metadata(name, *, schema=None) -> bool`: remove one cached procedure.
 - `clear_metadata_cache() -> int`: clear the cache and return the number of entries.
-
-Metadata cache keys and qualified invalidation preserve identifier casing. Use the same
-canonical schema and procedure spelling throughout an application. Procora does not
-normalize casing because database identifier sensitivity depends on backend and catalog
-collation.
 - `call(name, parameters=None, *, schema=None, refresh=False, **values) -> ProcedureResult`:
   discover and execute a procedure.
 - `procedure(name, *, schema=None) -> Procedure`: create a reusable callable proxy. The
@@ -47,6 +42,11 @@ collation.
   `refresh_metadata=True` to refresh discovery.
 - `procedures.<name>(**values)`: call a procedure in the backend's default schema.
 - `schemas.<schema>.<name>(**values)`: call a schema-qualified procedure.
+
+Metadata cache keys and qualified invalidation preserve identifier casing. Use the same
+canonical schema and procedure spelling throughout an application. Procora does not
+normalize casing because database identifier sensitivity depends on backend and catalog
+collation.
 
 Every operation borrows a new connection. The connection is closed afterward, or
 passed to `connection_releaser` when one is configured.
@@ -108,3 +108,18 @@ typed custom pools and backends.
 
 The original driver exception is retained as `exception.__cause__` when Procora wraps
 an unexpected connection, discovery, or execution failure.
+
+## API stability
+
+For the 1.x release line, Semantic Versioning protects:
+
+- names exported by `procora.__all__`, including `__version__`;
+- documented call signatures and behavior of `connect`, `Database`, and `Procedure`;
+- documented fields and properties of metadata, capability, and result models;
+- the public exception hierarchy;
+- the `Backend` extension contract and typed connection/cursor protocols.
+
+Underscore-prefixed helpers, SQL catalog queries, cache internals, and driver-specific
+values stored inside `backend_data` are implementation details. New optional backend
+capabilities, new exception subclasses, and additive methods may be introduced in minor
+releases without breaking existing documented behavior.

@@ -33,6 +33,10 @@ an optional smoke workflow.
 
 SQLite is not listed because SQLite does not implement stored procedures.
 
+Procora follows Semantic Versioning. In the 1.x line, the exported Python API,
+documented result and error behavior, and custom backend contract remain backward
+compatible; internal catalog SQL and underscore-prefixed helpers are not public API.
+
 ## Installation
 
 Install only the driver you need:

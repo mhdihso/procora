@@ -47,6 +47,7 @@ __all__ = [
     "ProcoraError",
     "ResultSet",
     "UnsupportedParameterError",
+    "__version__",
     "connect",
     "get_backend",
 ]
